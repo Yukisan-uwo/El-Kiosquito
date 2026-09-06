@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Inventario y Caducidad
+  version: 1.0.0
+  description: Contrato de la API del módulo 002-inventario-caducidad. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /productos:
+    post:
+      summary: Registrar un producto en el catálogo (OO-IN01)
+      operationId: crearProducto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, categoria, unidad_venta, unidad_inventario, es_fraccionable, es_perecedero]
+              properties:
+                nombre: { type: string }
+                categoria: { type: string }
+                codigo_barras: { type: string, nullable: true }
+                unidad_venta: { type: string }
+                unidad_inventario: { type: string }
+                es_fraccionable: { type: boolean }
+                factor_conversion: { type: number, format: decimal, nullable: true }
+                es_perecedero: { type: boolean }
+      responses:
+        '201': { description: Producto creado, content: { application/json: { schema: { $ref: '#/components/schemas/Producto' } } } }
+        '422': { description: 'es_fraccionable=true sin factor_conversion (RN-IN-002)' }
+
+  /productos/{id}:
+    patch:
+      summary: Actualizar un producto existente (OO-IN01)
+      operationId: actualizarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string }
+                categoria: { type: string }
+                es_fraccionable: { type: boolean }
+                factor_conversion: { type: number, format: decimal, nullable: true }
+                activo: { type: boolean }
+      responses:
+        '200': { description: Actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Producto' } } } }
+        '422': { description: 'es_fraccionable=true sin factor_conversion (RN-IN-002)' }
+
+  /inventario/ingresos:
+    post:
+      summary: Registrar ingreso de stock a una sucursal, con lote opcional si es perecedero (OO-IN02, OO-IN03)
+      operationId: registrarIngresoStock
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, cantidad]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                cantidad: { type: number, format: decimal, minimum: 0.001 }
+                fecha_caducidad: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: 'Stock actualizado (y lote creado si el producto es perecedero y se envió fecha_caducidad)' }
+        '403': { description: 'sucursal_id no pertenece al token (Art. 3.3)' }
+
+  /inventario/proximos-a-caducar:
+    get:
+      summary: Consultar lotes próximos a caducar por sucursal (OO-IN04)
+      operationId: consultarProximosACaducar
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LoteProducto' }
+        '409': { description: 'No hay umbral de próximo-a-caducar configurado en parametro_sistema' }
+
+  /inventario/lotes/{id}/retiro:
+    patch:
+      summary: Registrar el retiro o descuento aplicado a un lote (OO-IN05)
+      operationId: registrarRetiroLote
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cantidad_retirada, motivo_retiro]
+              properties:
+                cantidad_retirada: { type: number, format: decimal, minimum: 0.001 }
+                motivo_retiro: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'Lote y stock agregado actualizados' }
+        '422': { description: 'cantidad_retirada mayor a cantidad_restante del lote' }
+
+  /inventario/stock/{producto_id}:
+    get:
+      summary: Consultar el stock disponible en tiempo real (OO-IN06)
+      operationId: consultarStock
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/StockSucursal' } } } }
+        '403': { description: 'sucursal_id no pertenece al token (Art. 3.3)' }
+
+  /inventario/ajustes:
+    post:
+      summary: Registrar un ajuste de inventario tras conteo físico (OO-IN07)
+      operationId: registrarAjusteInventario
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, cantidad_ajuste, motivo]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                cantidad_ajuste: { type: number, format: decimal }
+                motivo: { type: string, minLength: 3 }
+      responses:
+        '201': { description: Ajuste registrado }
+        '422': { description: 'El ajuste dejaría cantidad_disponible en negativo (RF-IN-009)' }
+
+  /inventario/rotacion/evaluar:
+    post:
+      summary: Ejecutar el proceso batch que marca productos sin rotación (OO-IN08, Sistema — invocado por Airflow/cron, no por un rol de negocio)
+      operationId: evaluarRotacion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 'Proceso batch ejecutado, retorna cuántos registros se marcaron/desmarcaron' }
+
+  /inventario/sin-rotacion:
+    get:
+      summary: Consultar productos sin rotación, candidatos a liquidación (OO-IN09)
+      operationId: consultarSinRotacion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockSucursal' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Producto:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        categoria: { type: string }
+        codigo_barras: { type: string, nullable: true }
+        unidad_venta: { type: string }
+        unidad_inventario: { type: string }
+        es_fraccionable: { type: boolean }
+        factor_conversion: { type: number, nullable: true }
+        es_perecedero: { type: boolean }
+        activo: { type: boolean }
+    StockSucursal:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        cantidad_disponible: { type: number }
+        dias_sin_venta: { type: integer }
+        marcado_sin_rotacion: { type: boolean }
+    LoteProducto:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        fecha_caducidad: { type: string, format: date }
+        cantidad_lote: { type: number }
+        cantidad_restante: { type: number }

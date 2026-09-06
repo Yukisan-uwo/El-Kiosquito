@@ -1,0 +1,213 @@
+# El Kiosquito — capa operativa (Postgres + API) y capa táctica
+# (ClickHouse + Airflow) en un solo stack. Variables configurables en
+# .env (ver .env.example) — nunca se hardcodean contraseñas acá.
+#
+# Arranque: `docker compose up -d --build`. Orden real de dependencias:
+#   postgres -> backend (corre `alembic upgrade head` y recién ahí sirve)
+#            -> etl-bootstrap (crea la cuenta de servicio del ETL, una
+#               sola vez — ver scripts/crear_cuenta_servicio_etl.py)
+#            -> airflow-init (migra el metastore propio de Airflow)
+#            -> airflow-webserver / airflow-scheduler
+#   clickhouse arranca en paralelo y se auto-inicializa con el DDL de
+#   ./etl/ddl (dimensiones antes que hechos por el prefijo numérico —
+#   el motor de ClickHouse corre esos .sql en orden alfabético).
+#
+# Airflow usa su PROPIO Postgres de metadatos (airflow-postgres) —
+# separado del Postgres operativo de El Kiosquito a propósito: son datos
+# de dos sistemas distintos (agendamiento de tareas vs. negocio), y
+# mezclarlos en el mismo motor haría que un problema de una base
+# arrastre a la otra.
+
+x-airflow-common-env: &airflow-common-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+  AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-cambiar-en-produccion}
+  PYTHONPATH: /opt/project
+  # Configuración de etl/config.py — mismas variables que usa el ETL
+  # corrido standalone, apuntando a los hostnames de la red de docker
+  # compose en vez de localhost.
+  POSTGRES_DSN: postgresql://${POSTGRES_USER:-elkiosquito}:${POSTGRES_PASSWORD:-elkiosquito_dev}@postgres:5432/${POSTGRES_DB:-elkiosquito}
+  CLICKHOUSE_HOST: clickhouse
+  CLICKHOUSE_NATIVE_PORT: "9000"
+  CLICKHOUSE_DATABASE: elkiosquito_dw
+  API_BASE_URL: http://backend:8000/api/v1
+  API_SERVICE_EMAIL: ${ETL_SERVICE_EMAIL:-etl@elkiosquito.local}
+  API_SERVICE_PASSWORD: ${ETL_SERVICE_PASSWORD:?la contraseña de la cuenta de servicio del ETL es obligatoria — definila en .env}
+  # Bug real encontrado probando contra Docker real: dejar el usuario
+  # `default` de ClickHouse sin contraseña (el default de etl/config.py,
+  # pensado para el ClickHouse nativo del sandbox de desarrollo) no
+  # coincide de forma confiable con cómo la imagen oficial
+  # clickhouse-server:24.8 deja configurado ese usuario cuando no se le
+  # pasa CLICKHOUSE_PASSWORD explícita — el driver recibe `Code: 516.
+  # Authentication failed`. Se fija una contraseña real en ambos lados
+  # (acá y en el servicio `clickhouse` abajo) desde la MISMA variable de
+  # .env, para que nunca puedan desincronizarse.
+  CLICKHOUSE_USER: default
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?la contraseña del usuario default de ClickHouse es obligatoria — definila en .env}
+
+x-airflow-common-volumes: &airflow-common-volumes
+  - ./etl:/opt/project:ro
+  - airflow_logs:/opt/airflow/logs
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-elkiosquito}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-elkiosquito_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-elkiosquito}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-elkiosquito}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-elkiosquito}:${POSTGRES_PASSWORD:-elkiosquito_dev}@postgres:5432/${POSTGRES_DB:-elkiosquito}
+      # Asistente conversacional (Art. 5.10, enmienda v1.4.0) — el
+      # backend ahora LEE ClickHouse (nunca escribe, eso sigue siendo
+      # exclusivo del ETL) para las tools del asistente, y llama a
+      # OpenRouter como único proveedor de LLM externo admitido.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_NATIVE_PORT: "9000"
+      CLICKHOUSE_DATABASE: elkiosquito_dw
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?la contraseña del usuario default de ClickHouse es obligatoria — definila en .env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3.5-lightning:free}
+      # Notificaciones al cliente por correo (Art. 8.4) — canal real,
+      # opcional a nivel de stack igual que OpenRouter: sin estas
+      # variables, cupón/campaña se siguen registrando con éxito, solo
+      # queda notificacion_enviada=false y el motivo real (ver
+      # app/services/notificaciones.py, Art. 8.6).
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CONTRASENA_APP: ${SMTP_CONTRASENA_APP:-}
+      SMTP_REMITENTE_NOMBRE: ${SMTP_REMITENTE_NOMBRE:-El Kiosquito}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "8000:8000"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_DB: elkiosquito_dw
+      # Misma variable que CLICKHOUSE_PASSWORD de x-airflow-common-env —
+      # ver el comentario ahí. Con esta variable puesta, la propia imagen
+      # oficial escribe la contraseña real del usuario `default`
+      # (users.d/docker_related_config.xml) en vez de dejarlo en el
+      # estado ambiguo que causaba el `Code: 516` contra el driver.
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?la contraseña del usuario default de ClickHouse es obligatoria — definila en .env}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      # DDL versión moderna: sin allow_experimental_low_cardinality_type
+      # (esa bandera solo hacía falta contra el ClickHouse 18.16.1 usado
+      # para probar el diseño en el sandbox de desarrollo — ver
+      # ddl/001_dimensiones.sql).
+      - ./etl/ddl:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  etl-bootstrap:
+    build: ./etl
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-elkiosquito}:${POSTGRES_PASSWORD:-elkiosquito_dev}@postgres:5432/${POSTGRES_DB:-elkiosquito}
+      ETL_SERVICE_EMAIL: ${ETL_SERVICE_EMAIL:-etl@elkiosquito.local}
+      ETL_SERVICE_PASSWORD: ${ETL_SERVICE_PASSWORD:?la contraseña de la cuenta de servicio del ETL es obligatoria — definila en .env}
+    working_dir: /opt/airflow
+    volumes:
+      - ./etl:/opt/airflow:ro
+    entrypoint: ["python", "-m", "scripts.crear_cuenta_servicio_etl"]
+
+  airflow-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow-init:
+    build: ./etl
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      etl-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      <<: *airflow-common-env
+    volumes: *airflow-common-volumes
+    entrypoint:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --password admin \
+          --firstname El --lastname Kiosquito \
+          --role Admin --email admin@elkiosquito.local || true
+
+  airflow-webserver:
+    build: ./etl
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    environment:
+      <<: *airflow-common-env
+    volumes: *airflow-common-volumes
+    command: webserver
+    ports:
+      - "8080:8080"
+
+  airflow-scheduler:
+    build: ./etl
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    environment:
+      <<: *airflow-common-env
+    volumes: *airflow-common-volumes
+    command: scheduler
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  airflow_postgres_data:
+  airflow_logs:

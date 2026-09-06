@@ -1,0 +1,32 @@
+# Secretos reales — NUNCA subir (Gmail SMTP, OpenRouter API key, passwords
+# de Postgres/ClickHouse/Airflow). .env.example sí se sube, sin valores reales.
+.env
+.env.local
+.env.*.local
+
+# Dependencias — se reinstalan con npm install / pip install, no se versionan
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Builds y artefactos generados
+frontend/app/dist/
+frontend/app/build/
+frontend/app/coverage/
+.pytest_cache/
+.mypy_cache/
+*.log
+
+# Volúmenes/datos locales de Docker (si algún día se montan a disco en vez
+# de volumes nombrados)
+pgdata/
+clickhouse-data/
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * Tokens del sistema de diseño de El Kiosquito.
+ * Fuente: doc de proyecto "El Kiosquito — Sistema de Diseño Frontend" y
+ * frontend/prompt-interfaces-ia.md — valores ya fijados, no se inventan acá.
+ * Tailwind v4: el tema vive en CSS (@theme), no en tailwind.config.ts.
+ */
+@theme {
+  /* Paleta ámbar/amarillo (Tarea #62, 2026-09-06) — reemplaza el verde
+     original: dos proyectos del curso convergieron en un verde+naranja
+     casi idéntico, así que se necesitaba una identidad realmente propia,
+     no solo "otro tono de verde". Amarillo dorado intenso como color de
+     marca, acento coral cálido — ver Art. 9.2 v1.6.0 de la constitución
+     para el detalle de por qué estos tonos exactos (contraste real
+     calculado, no elegido a ojo). */
+  --color-brand-primary: #946F00;
+  --color-brand-primary-text: #705400;
+  --color-brand-primary-soft: #F8F1DD;
+  --color-brand-deep: #3D2E00;
+  --color-brand-accent: #E64919;
+
+  --color-surface-bg: #FAF6EE;
+  --color-surface-card: #FFFFFF;
+
+  --color-text-primary: #1F2B27;
+  --color-text-secondary: #5C6B65;
+
+  /* status-success y status-warning se oscurecieron en la Tarea #59
+     (hallazgo real de auditoría de accesibilidad) respecto del Art. 11.1
+     original: el tono declarado ahí (#1E7D4F / #C77D1E) no llega a 4.5:1
+     de contraste contra su propio fondo "-soft" (usado en BadgeEstado,
+     4.2) — #C77D1E daba apenas 2.82:1, una falla real de WCAG 2.1 AA, no
+     un detalle cosmético. Se afinó el mismo tono (misma familia de hue,
+     solo más oscuro) hasta pasar 4.5:1 tanto sobre su "-soft" como sobre
+     blanco — verificado con cálculo de luminancia relativa real, no a
+     ojo. status-danger e info ya pasaban AA sin cambios. */
+  --color-status-success: #1D794C;
+  --color-status-success-soft: #E1F0EC;
+  --color-status-danger: #A32E1F;
+  --color-status-danger-soft: #F6E4E1;
+  --color-status-warning: #965E17;
+  --color-status-warning-soft: #FBEBD9;
+  --color-status-info: #2F6B8C;
+  --color-status-info-soft: #E1EDF2;
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", "Plus Jakarta Sans", sans-serif;
+
+  /* Escala tipográfica de 6 niveles — nunca más de 3 a la vez fuera del shell. */
+  --text-display-xl: 40px;
+  --text-display-xl--line-height: 44px;
+  --text-display-xl--font-weight: 600;
+  --text-display-lg: 28px;
+  --text-display-lg--line-height: 34px;
+  --text-display-lg--font-weight: 600;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-title--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.04em;
+
+  --radius-card: 12px;
+  --radius-pill: 999px;
+
+  --shadow-elevation-1: 0 1px 2px rgba(11,46,42,0.06);
+  --shadow-elevation-2: 0 8px 24px rgba(11,46,42,0.12);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-surface-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Anillo de foco siempre visible (Art. 5.4/11.2, WCAG 2.1 AA) — nunca
+   `outline: none` sin reemplazo. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-accent);
+  outline-offset: 2px;
+}
+
+/* prefers-reduced-motion se aplica también a nivel de <MotionProvider>,
+   pero esto cubre cualquier transición CSS nativa fuera de Motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

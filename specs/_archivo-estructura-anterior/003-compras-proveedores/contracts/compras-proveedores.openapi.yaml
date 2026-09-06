@@ -1,0 +1,210 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Compras y Proveedores
+  version: 1.0.0
+  description: Contrato de la API del módulo 003-compras-proveedores. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /proveedores:
+    post:
+      summary: Registrar un proveedor (OO-CP01)
+      operationId: crearProveedor
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre: { type: string }
+                contacto: { type: string, nullable: true }
+      responses:
+        '201': { description: Proveedor creado, content: { application/json: { schema: { $ref: '#/components/schemas/Proveedor' } } } }
+
+  /proveedores/{id}:
+    patch:
+      summary: Actualizar un proveedor (OO-CP01)
+      operationId: actualizarProveedor
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string }
+                contacto: { type: string, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+
+  /proveedores/{id}/desactivar:
+    patch:
+      summary: Dar de baja un proveedor, sin afectar sus órdenes existentes (OO-CP09)
+      operationId: desactivarProveedor
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Proveedor desactivado }
+
+  /compras/ordenes:
+    post:
+      summary: Registrar una orden de compra (OO-CP02)
+      operationId: crearOrdenCompra
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proveedor_id, sucursal_id, items]
+              properties:
+                proveedor_id: { type: integer }
+                sucursal_id: { type: integer }
+                es_oferta: { type: boolean, default: false }
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [producto_id, cantidad_pedida, precio_ofrecido]
+                    properties:
+                      producto_id: { type: integer }
+                      cantidad_pedida: { type: number, format: decimal, minimum: 0.001 }
+                      precio_ofrecido: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: Orden creada en estado pendiente, content: { application/json: { schema: { $ref: '#/components/schemas/OrdenCompra' } } } }
+        '403': { description: 'sucursal_id no pertenece al alcance del token (Art. 3.3)' }
+
+  /compras/ordenes/{detalle_id}/recepciones:
+    post:
+      summary: Registrar un evento de recepción de una línea de la orden (OO-CP03, OO-CP04)
+      operationId: registrarRecepcion
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: detalle_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cantidad_recibida_evento]
+              properties:
+                cantidad_recibida_evento: { type: number, format: decimal, minimum: 0.001 }
+      responses:
+        '201': { description: 'Recepción registrada; cantidad_recibida y estado de la orden recalculados' }
+        '422': { description: 'Orden es_oferta=true sin pronostico_consultado=true en este detalle (RN-CP-001)' }
+
+  /compras/productos/{producto_id}/historial-costo:
+    get:
+      summary: Consultar el historial de variación de costo de un producto por proveedor (OO-CP05)
+      operationId: consultarHistorialCosto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistorialCostoProducto' }
+
+  /compras/productos/{producto_id}/comparativa-proveedores:
+    get:
+      summary: Comparar el costo vigente de un producto entre distintos proveedores (OO-CP06)
+      operationId: consultarComparativaProveedores
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: 'Último costo registrado por cada proveedor (Decisión 2 de research.md)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistorialCostoProducto' }
+
+  /compras/productos/{producto_id}/pronostico:
+    get:
+      summary: Consultar el pronóstico de demanda antes de confirmar una compra por oferta (OO-CP07)
+      operationId: consultarPronosticoParaCompra
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: 'Pronóstico consultado (marca pronostico_consultado=true en el detalle si se pasa detalle_id como query param)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  producto_id: { type: integer }
+                  cantidad_recomendada: { type: number }
+                  es_estimacion_provisional: { type: boolean, description: 'true mientras 009-analitica-reportes no esté implementado (ver plan.md)' }
+
+  /compras/ordenes/{detalle_id}/motivo-oferta:
+    patch:
+      summary: Registrar el motivo cuando una compra por oferta no siguió la recomendación del pronóstico (OO-CP08)
+      operationId: registrarMotivoOferta
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: detalle_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo_no_siguio_pronostico]
+              properties:
+                motivo_no_siguio_pronostico: { type: string, minLength: 3 }
+      responses:
+        '200': { description: Actualizado }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Proveedor:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        contacto: { type: string, nullable: true }
+        activo: { type: boolean }
+    OrdenCompra:
+      type: object
+      properties:
+        id: { type: integer }
+        proveedor_id: { type: integer }
+        sucursal_id: { type: integer }
+        es_oferta: { type: boolean }
+        estado: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DetalleOrdenCompra' }
+    DetalleOrdenCompra:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        cantidad_pedida: { type: number }
+        cantidad_recibida: { type: number, description: 'valor derivado, ver Decisión 1 de research.md' }
+        precio_ofrecido: { type: number }
+        pronostico_consultado: { type: boolean }
+        motivo_no_siguio_pronostico: { type: string, nullable: true }
+    HistorialCostoProducto:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        proveedor_id: { type: integer }
+        costo: { type: number }
+        fecha: { type: string, format: date-time }

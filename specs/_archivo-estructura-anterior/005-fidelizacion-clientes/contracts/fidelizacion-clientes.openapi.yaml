@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Fidelización y Clientes
+  version: 1.0.0
+  description: Contrato de la API del módulo 005-fidelizacion-clientes. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /clientes:
+    post:
+      summary: Registrar un cliente (OO-FC01)
+      operationId: crearCliente
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre: { type: string }
+                contacto: { type: string, nullable: true }
+                fecha_nacimiento: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: Cliente creado, content: { application/json: { schema: { $ref: '#/components/schemas/Cliente' } } } }
+
+  /clientes/{id}/historial-compras:
+    get:
+      summary: Consultar el historial de compras de un cliente (OO-FC02, solo lectura sobre Ventas y Caja)
+      operationId: consultarHistorialCompras
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, description: 'Resumen de venta, ver Venta en 001-ventas-y-caja/contracts' }
+
+  /clientes/{id}/segmento:
+    get:
+      summary: Consultar el segmento de valor más reciente de un cliente (OO-FC03)
+      operationId: consultarSegmentoCliente
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: 'Segmento más reciente, o datos_suficientes=false si nunca se calculó (RF-FC-009)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SegmentoClienteRespuesta' }
+
+  /fidelizacion/segmentos:
+    post:
+      summary: Registrar el resultado de un ciclo de segmentación K-Means (OO-FC03, Sistema)
+      operationId: registrarCicloSegmentacion
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SegmentoClienteEntrada' }
+      responses:
+        '201': { description: Ciclo registrado }
+
+  /fidelizacion/cupones:
+    post:
+      summary: Registrar el envío de un cupón, de cumpleaños o activado por patrón de compra (OO-FC04, OO-FC05)
+      operationId: crearCupon
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cliente_id, tipo_origen, descuento_tipo, descuento_valor, fecha_expiracion]
+              properties:
+                cliente_id: { type: integer }
+                tipo_origen: { type: string, enum: [cumpleanos, patron_compra] }
+                descuento_tipo: { type: string, enum: [porcentaje, monto_fijo] }
+                descuento_valor: { type: number, format: decimal, minimum: 0 }
+                fecha_expiracion: { type: string, format: date-time }
+      responses:
+        '201': { description: Cupón creado, content: { application/json: { schema: { $ref: '#/components/schemas/Cupon' } } } }
+
+  /fidelizacion/cupones/{id}/canjear:
+    patch:
+      summary: Registrar el canje de un cupón en una venta (OO-FC06)
+      operationId: canjearCupon
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [venta_id]
+              properties:
+                venta_id: { type: integer }
+      responses:
+        '200': { description: Cupón canjeado }
+        '422': { description: 'Cupón ya canjeado o vencido (RN-FC-001)' }
+
+  /fidelizacion/evaluaciones-churn:
+    post:
+      summary: Registrar el resultado de una evaluación de riesgo de abandono (OO-FC07, Sistema)
+      operationId: registrarEvaluacionChurn
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluacionChurnEntrada' }
+      responses:
+        '201': { description: Evaluación registrada }
+
+  /clientes/{id}/riesgo-abandono:
+    get:
+      summary: Consultar la evaluación de riesgo de abandono más reciente de un cliente (OO-FC07)
+      operationId: consultarRiesgoAbandono
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EvaluacionChurnRespuesta' } } } }
+
+  /fidelizacion/campanas-recuperacion:
+    post:
+      summary: Registrar el envío de una campaña de recuperación (OO-FC08)
+      operationId: crearCampanaRecuperacion
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cliente_id, evaluacion_churn_id]
+              properties:
+                cliente_id: { type: integer }
+                evaluacion_churn_id: { type: integer }
+                cupon_id: { type: integer, nullable: true }
+      responses:
+        '201': { description: Campaña registrada }
+        '409': { description: 'El cliente ya volvió a comprar desde su evaluación de riesgo (RN-FC-002)' }
+
+  /fidelizacion/campanas-recuperacion/{id}/resultado:
+    get:
+      summary: Consultar si el cliente recuperó actividad tras la campaña (OO-FC09)
+      operationId: consultarResultadoCampana
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campana_id: { type: integer }
+                  recupero_actividad: { type: boolean }
+                  fecha_primera_compra_posterior: { type: string, format: date-time, nullable: true }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Cliente:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        contacto: { type: string, nullable: true }
+        fecha_nacimiento: { type: string, format: date, nullable: true }
+    SegmentoClienteEntrada:
+      type: object
+      required: [cliente_id, segmento, tamano_muestra, periodo_inicio, periodo_fin]
+      properties:
+        cliente_id: { type: integer }
+        segmento: { type: string }
+        frecuencia_snapshot: { type: number, nullable: true }
+        margen_snapshot: { type: number, nullable: true }
+        recencia_dias_snapshot: { type: integer, nullable: true }
+        tamano_muestra: { type: integer }
+        periodo_inicio: { type: string, format: date }
+        periodo_fin: { type: string, format: date }
+    SegmentoClienteRespuesta:
+      type: object
+      properties:
+        cliente_id: { type: integer }
+        datos_suficientes: { type: boolean }
+        segmento: { type: string, nullable: true }
+        tamano_muestra: { type: integer, nullable: true }
+        periodo_inicio: { type: string, format: date, nullable: true }
+        periodo_fin: { type: string, format: date, nullable: true }
+    Cupon:
+      type: object
+      properties:
+        id: { type: integer }
+        cliente_id: { type: integer }
+        tipo_origen: { type: string }
+        codigo: { type: string }
+        estado: { type: string }
+        fecha_expiracion: { type: string, format: date-time }
+    EvaluacionChurnEntrada:
+      type: object
+      required: [cliente_id, es_riesgo_real, dias_sin_compra_al_momento, justificacion, tamano_muestra]
+      properties:
+        cliente_id: { type: integer }
+        es_riesgo_real: { type: boolean }
+        dias_sin_compra_al_momento: { type: integer }
+        frecuencia_historica_dias: { type: number, nullable: true }
+        justificacion: { type: string, minLength: 10 }
+        tamano_muestra: { type: integer }
+    EvaluacionChurnRespuesta:
+      type: object
+      properties:
+        cliente_id: { type: integer }
+        datos_suficientes: { type: boolean }
+        es_riesgo_real: { type: boolean, nullable: true }
+        justificacion: { type: string, nullable: true }
+        fecha_evaluacion: { type: string, format: date-time, nullable: true }

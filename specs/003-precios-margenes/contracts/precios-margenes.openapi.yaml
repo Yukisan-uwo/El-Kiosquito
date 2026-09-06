@@ -1,0 +1,276 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Precios y Márgenes
+  version: 1.3.0
+  description: Contrato de la API del módulo 003-precios-margenes. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /precios:
+    post:
+      summary: Registrar o actualizar el precio de venta de un producto por sucursal (OO-PM01)
+      operationId: registrarPrecio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, precio_venta]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                precio_venta: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: 'Precio registrado; cualquier recomendación pendiente de este producto/sucursal pasa a obsoleta', content: { application/json: { schema: { $ref: '#/components/schemas/HistorialPrecioProducto' } } } }
+        '403': { description: 'sucursal_id no pertenece al alcance del token (Art. 3.3)' }
+
+  /precios/{producto_id}/margen:
+    get:
+      summary: Consultar el margen real de un producto (OO-PM02)
+      operationId: consultarMargenReal
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: 'Margen calculado, o datos_suficientes=false si falta precio o costo (RNF-PM-001)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MargenReal' }
+
+  /precios/competencia:
+    post:
+      summary: Registrar el precio de referencia de la competencia (OO-PM03)
+      operationId: registrarPrecioCompetencia
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, fuente_competencia_id, precio_referencia]
+              properties:
+                producto_id: { type: integer }
+                fuente_competencia_id: { type: integer, description: 'FK al catálogo fuente_competencia — RF-PM-012, enmienda v1.2. Antes era `fuente` como texto libre. El canal ya no se envía: se deriva de la fuente (3NF), ver data-model.md.' }
+                precio_referencia: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: Registrado }
+
+  /precios/{producto_id}/comparativa-competencia:
+    get:
+      summary: Comparar el precio propio vigente contra el precio de competencia más reciente, opcionalmente filtrado por tipo de canal (OO-PM04)
+      operationId: consultarComparativaCompetencia
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+        - { name: canal_codigo, in: query, required: false, schema: { type: string }, description: 'enmienda v1.1, renombrado en v1.2 — filtra por canal vía fuente_competencia.canal_codigo. Si se omite, usa el precio de competencia más reciente sin importar canal' }
+        - { name: agrupar_por_fuente, in: query, required: false, schema: { type: boolean, default: false }, description: 'RF-PM-014, enmienda v1.2 — true devuelve una fila por competidor concreto en vez de una sola comparación agregada; responde "¿contra qué competidor estoy peor de precio?"' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ComparativaCompetencia' } } } }
+
+  /catalogos/fuentes-competencia:
+    get:
+      summary: Listar las fuentes de competencia monitoreadas, con su canal (RF-PM-013, enmienda v1.2)
+      operationId: listarFuentesCompetencia
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: canal_codigo, in: query, required: false, schema: { type: string } }
+        - { name: solo_activas, in: query, required: false, schema: { type: boolean, default: true } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/FuenteCompetencia' } } } } }
+    post:
+      summary: Registrar una fuente de competencia (RF-PM-013, enmienda v1.2)
+      operationId: crearFuenteCompetencia
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, canal_codigo]
+              properties:
+                nombre: { type: string, maxLength: 120 }
+                canal_codigo: { type: string }
+      responses:
+        '201': { description: Fuente registrada }
+        '409': { description: 'nombre ya registrado' }
+        '404': { description: 'canal_codigo inexistente' }
+
+  /catalogos/fuentes-competencia/{id}:
+    patch:
+      summary: Actualizar o dar de baja una fuente de competencia (RF-PM-013, RN-PM-006, enmienda v1.2)
+      operationId: actualizarFuenteCompetencia
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { nombre: { type: string, maxLength: 120 }, canal_codigo: { type: string }, activo: { type: boolean } } }
+      responses:
+        '200': { description: 'Actualizada. Las observaciones históricas la siguen referenciando aunque quede inactiva.' }
+
+  /catalogos/clasificaciones-comerciales:
+    get:
+      summary: Listar las clasificaciones comerciales con su rango de margen objetivo (RF-PM-017, enmienda v1.2)
+      operationId: listarClasificacionesComerciales
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'El motor de pricing lee de aquí el rango objetivo, ya no lo tiene fijo en su código'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: gancho }
+                    etiqueta: { type: string }
+                    margen_objetivo_min: { type: number }
+                    margen_objetivo_max: { type: number }
+                    activo: { type: boolean }
+
+  /precios/clasificacion/{producto_id}:
+    patch:
+      summary: Marcar un producto como gancho o nicho, a nivel de cadena (OO-PM05). Desde la enmienda v1.2 cierra la vigencia anterior y abre la nueva en el historial, en la misma transacción (RN-PM-003).
+      operationId: clasificarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clasificacion, motivo_cambio]
+              properties:
+                clasificacion: { type: string, description: 'código del catálogo clasificacion_comercial — enmienda v1.2, ya no es un enum fijo del contrato' }
+                motivo_cambio: { type: string, minLength: 10, description: 'RN-PM-005, enmienda v1.2 — reclasificar cambia la política de precios del producto' }
+      responses:
+        '200': { description: Actualizado, con nueva entrada en producto_clasificacion_historial }
+        '404': { description: 'clasificación inexistente en el catálogo (enmienda v1.2)' }
+        '422': { description: 'motivo_cambio con menos de 10 caracteres (RN-PM-005, enmienda v1.2)' }
+
+  /precios/clasificacion/{producto_id}/historial:
+    get:
+      summary: Consultar el historial de clasificaciones de un producto, o la vigente en una fecha dada (RF-PM-015, RF-PM-016, enmienda v1.2)
+      operationId: consultarHistorialClasificacion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: en_fecha, in: query, required: false, schema: { type: string, format: date }, description: 'si se pasa, devuelve solo la clasificación vigente en esa fecha — el margen histórico de OT1.1 debe evaluarse contra el rango objetivo que regía entonces, no contra el actual' }
+      responses:
+        '200':
+          description: 'Historial ordenado cronológicamente; la clasificación vigente tiene fecha_hasta = null'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    clasificacion: { type: string }
+                    fecha_desde: { type: string, format: date-time }
+                    fecha_hasta: { type: string, format: date-time, nullable: true }
+                    motivo_cambio: { type: string }
+                    usuario_id: { type: integer }
+
+  /precios/recomendaciones:
+    post:
+      summary: Registrar una recomendación de precio generada por el motor de pricing dinámico (OO-PM06, Sistema)
+      operationId: crearRecomendacionPrecio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, precio_recomendado, justificacion]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                precio_recomendado: { type: number, format: decimal, minimum: 0 }
+                justificacion: { type: string, minLength: 10 }
+      responses:
+        '201': { description: Recomendación creada en estado pendiente, content: { application/json: { schema: { $ref: '#/components/schemas/RecomendacionPrecio' } } } }
+        '409': { description: 'Ya existe una recomendación pendiente para este producto/sucursal (RN-PM-001)' }
+
+  /precios/recomendaciones/{id}/resolucion:
+    patch:
+      summary: Aceptar o rechazar una recomendación de precio pendiente (OO-PM07)
+      operationId: resolverRecomendacionPrecio
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, description: 'código del catálogo estado_recomendacion; debe ser un estado final (es_estado_final = true), es decir aceptada o rechazada — nunca pendiente ni obsoleta. Enum retirado en la verificación cruzada de la enmienda transversal: era el único que quedaba desalineado con su catálogo.' }
+                confirmar_perdida: { type: boolean, default: false, description: 'RN-PM-007 (enmienda v1.3). Obligatorio en true solo cuando decision=aceptada y precio_recomendado queda por debajo del costo de reposición vigente del producto — evita aceptar por descuido un precio que vende a pérdida.' }
+      responses:
+        '200': { description: 'Resuelta; si fue aceptada, se creó una nueva entrada en historial_precio_producto con fuente=motor_dinamico' }
+        '409': { description: 'La recomendación ya no está pendiente (ya fue resuelta u obsoleta); o bien, si decision=aceptada y el precio queda por debajo del costo vigente sin confirmar_perdida=true (RN-PM-007, enmienda v1.3) — el cuerpo incluye precio_recomendado, costo_reposicion_vigente y perdida_unitaria' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HistorialPrecioProducto:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        precio_venta: { type: number }
+        fuente: { type: string }
+        vigente_desde: { type: string, format: date-time }
+    MargenReal:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        datos_suficientes: { type: boolean }
+        precio_venta_vigente: { type: number, nullable: true }
+        costo_reposicion_vigente: { type: number, nullable: true }
+        margen_real: { type: number, nullable: true }
+    ComparativaCompetencia:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        precio_propio_vigente: { type: number, nullable: true }
+        precio_competencia_mas_reciente: { type: number, nullable: true }
+        fuente_competencia: { type: string, nullable: true, description: 'nombre del competidor, resuelto desde el catálogo (enmienda v1.2)' }
+        fuente_competencia_id: { type: integer, nullable: true, description: 'enmienda v1.2' }
+        canal_competencia: { type: string, nullable: true, description: 'enmienda v1.1; desde v1.2 se deriva de fuente_competencia.canal_codigo, ya no es columna de precio_competencia' }
+    FuenteCompetencia:
+      type: object
+      description: 'Un local o canal concreto de la competencia que se monitorea (enmienda v1.2). Lleva id propio y no clave natural porque el nombre lo corrige el negocio y un local puede renombrarse sin afectar las observaciones históricas.'
+      properties:
+        id: { type: integer }
+        nombre: { type: string, example: 'Supermercado La Favorita — Quevedo centro' }
+        canal_codigo: { type: string, example: supermercado }
+        activo: { type: boolean }
+    RecomendacionPrecio:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        precio_actual_snapshot: { type: number }
+        precio_recomendado: { type: number }
+        justificacion: { type: string }
+        estado: { type: string }

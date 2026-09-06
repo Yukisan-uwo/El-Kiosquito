@@ -1,0 +1,797 @@
+<title>Guion El Kiosquito</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #FAF6EE;
+    --surface: #FFFFFF;
+    --surface-alt: #F8F1DD;
+    --ink: #1F2B27;
+    --ink-soft: #5C6B65;
+    --ink-faint: #96917A;
+    --border: #E5D9BC;
+    --primary: #946F00;
+    --primary-deep: #3D2E00;
+    --primary-text: #705400;
+    --secondary: #965E17;
+    --accent: #E64919;
+    --info: #2F6B8C;
+    --code-bg: #F1E6C8;
+    --shadow: 0 1px 2px rgba(61,46,0,0.05), 0 8px 24px rgba(61,46,0,0.06);
+    --measure: 42rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1B1710;
+      --surface: #241E14;
+      --surface-alt: #332A18;
+      --ink: #F3EDE0;
+      --ink-soft: #C9BFA8;
+      --ink-faint: #8F8570;
+      --border: #4A4028;
+      --primary: #E8BB4D;
+      --primary-deep: #F4D998;
+      --primary-text: #F0C665;
+      --secondary: #E0B45E;
+      --accent: #FF9466;
+      --info: #7FB4D6;
+      --code-bg: #332916;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1B1710;
+    --surface: #241E14;
+    --surface-alt: #332A18;
+    --ink: #F3EDE0;
+    --ink-soft: #C9BFA8;
+    --ink-faint: #8F8570;
+    --border: #4A4028;
+    --primary: #E8BB4D;
+    --primary-deep: #F4D998;
+    --primary-text: #F0C665;
+    --secondary: #E0B45E;
+    --accent: #FF9466;
+    --info: #7FB4D6;
+    --code-bg: #332916;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; color: var(--ink); text-wrap: balance; line-height: 1.15; margin: 0; }
+  code, .mono { font-family: 'IBM Plex Mono', 'Courier New', monospace; }
+
+  a { color: var(--primary-text); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--primary); }
+  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  .toc {
+    width: 306px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 28px 22px 40px;
+  }
+  .toc-brand { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .toc-brand .mark { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.22rem; color: var(--primary); }
+  .toc-brand .mark em { font-style: normal; color: var(--secondary); }
+  .toc-sub { font-size: 0.78rem; color: var(--ink-faint); margin-bottom: 26px; letter-spacing: 0.02em; }
+
+  .toc nav { display: flex; flex-direction: column; gap: 2px; }
+  .toc-group { margin-top: 16px; }
+  .toc-group:first-of-type { margin-top: 0; }
+  .toc-group-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-faint); font-weight: 600; margin: 0 0 6px 2px; }
+  .toc a.toc-link { display: flex; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 7px; color: var(--ink-soft); font-size: 0.85rem; text-decoration: none; transition: background 0.15s ease, color 0.15s ease; }
+  .toc a.toc-link .num { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--ink-faint); min-width: 1.7em; }
+  .toc a.toc-link:hover { background: var(--surface-alt); color: var(--ink); }
+  .toc a.toc-link.active { background: var(--surface-alt); color: var(--primary); font-weight: 600; }
+  .toc a.toc-link.active .num { color: var(--secondary); }
+
+  .toc-toggle { display: none; }
+
+  main { flex: 1; min-width: 0; padding: 64px clamp(20px, 6vw, 96px) 120px; }
+  .content-col { max-width: 46rem; margin: 0 auto; }
+
+  .cover { margin-bottom: 72px; }
+  .cover .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--secondary); margin-bottom: 18px; display: block; }
+  .cover h1 { font-size: clamp(2.15rem, 5vw, 3.1rem); font-weight: 600; margin-bottom: 20px; }
+  .cover h1 em { font-style: italic; color: var(--primary); }
+  .cover p.lede { font-size: 1.16rem; color: var(--ink-soft); max-width: var(--measure); margin: 0 0 28px; }
+  .cover .howto { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 26px; box-shadow: var(--shadow); font-size: 0.95rem; color: var(--ink-soft); }
+  .cover .howto strong { color: var(--ink); }
+
+  section.chapter { padding-top: 46px; margin-top: 46px; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+  section.chapter:first-of-type { border-top: none; }
+  .chapter > .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--secondary); letter-spacing: 0.06em; display: block; margin-bottom: 10px; }
+  .chapter > h2 { font-size: clamp(1.65rem, 3.4vw, 2.2rem); font-weight: 600; margin-bottom: 6px; }
+  .chapter > .dek { color: var(--ink-soft); font-size: 1.05rem; max-width: var(--measure); margin-bottom: 30px; }
+
+  h3.sub { font-size: 1.26rem; font-weight: 600; margin-top: 40px; margin-bottom: 14px; color: var(--primary); }
+  h4.subsub { font-size: 1.04rem; font-weight: 700; margin-top: 26px; margin-bottom: 10px; color: var(--ink); font-family: 'Inter', sans-serif; }
+
+  p { max-width: var(--measure); margin: 0 0 16px; }
+  ul, ol { max-width: var(--measure); margin: 0 0 16px; padding-left: 1.3em; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--secondary); }
+  strong { color: var(--ink); font-weight: 700; }
+
+  .lead-q { font-family: 'Fraunces', serif; font-size: 1.28rem; font-style: italic; color: var(--primary); max-width: var(--measure); margin: 4px 0 20px; }
+
+  .callout { max-width: var(--measure); border-radius: 10px; padding: 16px 20px; margin: 22px 0; background: var(--surface); border: 1px solid var(--border); border-left-width: 4px; box-shadow: var(--shadow); }
+  .callout .tag { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 600; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout--leccion { border-left-color: var(--secondary); }
+  .callout--leccion .tag { color: var(--secondary); }
+  .callout--ojo { border-left-color: var(--accent); }
+  .callout--ojo .tag { color: var(--accent); }
+  .callout--dato { border-left-color: var(--info); }
+  .callout--dato .tag { color: var(--info); }
+
+  code.pill, .kv code { background: var(--code-bg); color: var(--primary-text); padding: 1px 7px; border-radius: 5px; font-size: 0.86em; white-space: nowrap; }
+
+  .diagram-fig { max-width: var(--measure); margin: 24px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .diagram-fig .svg-wrap { overflow-x: auto; padding: 18px; background: var(--surface-alt); }
+  .diagram-fig .svg-wrap svg { display: block; margin: 0 auto; max-width: 620px; width: 100%; height: auto; }
+  .diagram-fig figcaption { padding: 12px 20px 16px; font-size: 0.86rem; color: var(--ink-soft); }
+
+  table.role-table { width: 100%; max-width: var(--measure); border-collapse: collapse; margin: 20px 0; font-size: 0.91rem; }
+  table.role-table th, table.role-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.role-table th { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); font-weight: 600; }
+  .table-scroll { overflow-x: auto; }
+
+  .flow-steps { list-style: none; padding: 0; margin: 20px 0; max-width: var(--measure); counter-reset: flow; }
+  .flow-steps li { counter-increment: flow; position: relative; padding: 4px 0 4px 44px; margin-bottom: 4px; }
+  .flow-steps li::before { content: counter(flow); position: absolute; left: 0; top: 4px; width: 30px; height: 30px; border-radius: 50%; background: var(--surface-alt); border: 1px solid var(--border); color: var(--primary); font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; }
+
+  .module-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); padding: 26px 30px; margin: 30px 0; }
+  .module-card .module-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .module-card .module-head .code { font-family: 'IBM Plex Mono', monospace; color: var(--secondary); font-size: 0.85rem; }
+  .module-card h4 { font-family: 'Fraunces', serif; font-size: 1.36rem; font-weight: 600; color: var(--primary); margin: 0; }
+  .module-card .role-chip { display: inline-block; font-size: 0.72rem; font-family: 'IBM Plex Mono', monospace; color: var(--ink-soft); background: var(--surface-alt); border-radius: 999px; padding: 2px 10px; margin: 4px 6px 0 0; }
+  .module-card h5 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); font-family: 'Inter', sans-serif; font-weight: 700; margin: 18px 0 6px; }
+  .module-card p, .module-card ul { margin-bottom: 10px; }
+
+  hr.rule { border: none; border-top: 1px solid var(--border); max-width: var(--measure); margin: 34px 0; }
+
+  .backtotop { position: fixed; right: 26px; bottom: 26px; width: 44px; height: 44px; border-radius: 50%; background: var(--primary); color: #fff; border: none; cursor: pointer; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.15s ease; }
+  .backtotop.show { opacity: 1; pointer-events: auto; }
+  .backtotop:hover { transform: translateY(-2px); }
+
+  .closing { text-align: left; padding: 40px 0 10px; }
+  .closing .signoff { font-family: 'Fraunces', serif; font-style: italic; font-size: 1.18rem; color: var(--primary); }
+
+  @media (max-width: 980px) {
+    .toc { position: fixed; z-index: 40; left: 0; top: 0; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: var(--shadow); }
+    .toc.open { transform: translateX(0); }
+    .toc-toggle { display: flex; position: fixed; z-index: 41; top: 16px; left: 16px; align-items: center; gap: 8px; background: var(--primary); color: #fff; border: none; border-radius: 999px; padding: 10px 16px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.85rem; cursor: pointer; box-shadow: var(--shadow); }
+    main { padding-top: 84px; }
+  }
+</style>
+
+<div class="shell">
+  <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocNav">☰ Índice</button>
+
+  <aside class="toc" id="tocNav">
+    <div class="toc-brand"><span class="mark">Guion<em>ElKiosquito</em></span></div>
+    <p class="toc-sub">Para leer, entender y explicar el sistema completo</p>
+    <nav>
+      <div class="toc-group">
+        <a class="toc-link" href="#intro"><span class="num">00</span> Cómo usar este guion</a>
+      </div>
+      <div class="toc-group">
+        <p class="toc-group-label">Cómo se construyó</p>
+        <a class="toc-link" href="#metodologia"><span class="num">01</span> Specs, Speckit y NexoStay</a>
+        <a class="toc-link" href="#constitucion"><span class="num">02</span> La Constitución</a>
+        <a class="toc-link" href="#arquitectura"><span class="num">03</span> Arquitectura técnica</a>
+      </div>
+      <div class="toc-group">
+        <p class="toc-group-label">Los datos, primero</p>
+        <a class="toc-link" href="#catalogos"><span class="num">04</span> Catálogos y el dataset real</a>
+      </div>
+      <div class="toc-group">
+        <p class="toc-group-label">Qué hace el sistema</p>
+        <a class="toc-link" href="#modulos"><span class="num">05</span> Los once módulos</a>
+        <a class="toc-link" href="#roles"><span class="num">06</span> Roles y autenticación</a>
+      </div>
+      <div class="toc-group">
+        <p class="toc-group-label">La capa inteligente</p>
+        <a class="toc-link" href="#ia"><span class="num">07</span> IA, ML y el asistente</a>
+        <a class="toc-link" href="#frontend"><span class="num">08</span> Notificaciones y frontend</a>
+      </div>
+      <div class="toc-group">
+        <p class="toc-group-label">Cómo se supo que funcionaba</p>
+        <a class="toc-link" href="#calidad"><span class="num">09</span> Pruebas y hallazgos reales</a>
+        <a class="toc-link" href="#leccion"><span class="num">10</span> Lo que enseña de la materia</a>
+      </div>
+      <div class="toc-group">
+        <a class="toc-link" href="#cierre"><span class="num">11</span> Para cerrar</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="content-col">
+
+      <section class="cover" id="intro">
+        <span class="eyebrow">Guion de presentación — Construcción de Software, UTEQ</span>
+        <h1>Todo lo que hay<br>que saber de <em>El Kiosquito</em></h1>
+        <p class="lede">Este documento no es un resumen: es el guion completo para explicar El Kiosquito de memoria — cómo se decidió construirlo, cómo está armado por dentro, qué hace cada pieza, qué se comparó contra un caso real para no dejar la base de datos coja, y qué salió mal en el camino y por qué eso también es parte de la historia que vale la pena contar.</p>
+        <div class="howto">
+          <strong>Cómo leerlo:</strong> está ordenado igual que se construyó — primero la metodología y la constitución (las reglas que rigen todo el proyecto), después la arquitectura de las tres capas de datos, después cómo se verificó el modelo de datos contra un sistema de kiosco real para que ningún informe se quede sin dato que lo sostenga, después qué hace cada uno de los once módulos, después quién puede hacer qué, después la capa de inteligencia artificial y el canal de notificaciones, y por último las auditorías reales y lo que se aprendió corrigiendo errores concretos. Cada sección se sostiene sola: si te preguntan solo por un tema puntual, andá directo a esa sección desde el índice de la izquierda.
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 01 — METODOLOGÍA -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="metodologia">
+        <span class="eyebrow">Capítulo 01</span>
+        <h2>Antes de programar: specs, Speckit y la lección del proyecto anterior</h2>
+        <p class="dek">El Kiosquito no nació de una idea general que se fue programando sobre la marcha. Nació al revés — y nació, además, con un proyecto hermano ya cerrado (NexoStay, un sistema hotelero de la misma materia) como fuente concreta de errores que no había que repetir.</p>
+
+        <p class="lead-q">"¿Por qué escribir todo esto antes de programar, si al final el código es lo que importa?"</p>
+
+        <p>Porque en un proyecto normal la documentación se escribe <em>después</em>, como un resumen de lo que el código terminó haciendo — y ese documento nunca es del todo confiable, porque describe lo que pasó, no lo que se quiso que pasara. El <strong>desarrollo dirigido por especificaciones</strong> invierte esa relación: la especificación se escribe primero, completa y verificable, y se convierte en la fuente de verdad de la que se derivan el diseño técnico, las tareas y finalmente el código. Cada requisito de El Kiosquito sigue la misma regla que en NexoStay, tomada de una norma internacional real (ISO/IEC/IEEE 29148): único, verificable, atómico y sin ambigüedad.</p>
+
+        <h3 class="sub">Una spec, en la práctica, es un paquete de hasta siete archivos</h3>
+        <p>Cada uno de los once módulos vive en su propia carpeta numerada dentro de <code class="pill">specs/</code>, con roles muy distintos: <code class="pill">spec.md</code> (qué se pide y por qué, nunca el cómo), <code class="pill">research.md</code> (decisiones de diseño justificadas contra el negocio real, no genéricas), <code class="pill">data-model.md</code> (el DDL completo de cada tabla), <code class="pill">contracts/*.openapi.yaml</code> (el contrato REST verificable), <code class="pill">quickstart.md</code> y <code class="pill">checklist-requirements.md</code> (¿de verdad quedó implementado, con qué evidencia?). Es un paquete más completo que el que tuvo NexoStay en su momento — se incorporaron <code class="pill">research.md</code>, <code class="pill">data-model.md</code>, <code class="pill">quickstart.md</code> y contratos separados desde el principio, precisamente porque su ausencia fue una de las fricciones documentadas del proyecto anterior.</p>
+
+        <h3 class="sub">Once módulos, organizados por departamento real, no por capa técnica</h3>
+        <p>Cascada completa: <strong>4 objetivos estratégicos</strong> (uno por perspectiva del Balanced Scorecard — Financiera, Cliente, Procesos Internos, Aprendizaje y Crecimiento) → <strong>23 objetivos tácticos</strong>, uno por responsable de departamento → <strong>73 objetivos operativos</strong>, repartidos en nueve departamentos: Ventas y Caja, Inventario y Caducidad, Compras y Proveedores, Precios y Márgenes, Fidelización y Clientes, Prevención de Pérdidas y Seguridad, Expansión y Sucursales, Administración, y Analítica y Reportes. Los once módulos de software se organizaron por dominio funcional, con dependencias explícitas entre ellos (qué necesita a quién) y, con la misma claridad, qué queda fuera de alcance a propósito.</p>
+
+        <div class="callout callout--dato">
+          <span class="tag">Detalle metodológico</span>
+          <p>Antes de tocar una sola tabla, se armó la tabla completa <strong>Departamento | Objetivo Táctico | ¿Informe simple? | ¿Informe compuesto?</strong> que el propio enunciado del examen exige — un informe <strong>simple</strong> es una consulta directa sobre la base relacional (un listado, un filtro, sin transformación previa); uno <strong>compuesto</strong> necesita agregación temporal, cruce de hechos de distinto grano, o volumen suficiente para que agregarlo en caliente sobre Postgres degrade el punto de venta. De los 23 objetivos tácticos, <strong>17 generan también un informe compuesto</strong> — servido desde ClickHouse, nunca desde la base operativa — y los 6 restantes son simples puros (por ejemplo, monitorear la latencia del propio pipeline ETL sería circular si se hiciera compuesto). Ninguno resultó "compuesto puro": los 23 tienen debajo un listado operativo de respaldo en la base relacional, y confundir eso fue justamente uno de los tropiezos documentados de NexoStay.</p>
+        </div>
+
+        <h3 class="sub">Lo que el proyecto anterior enseñó, de verdad, artículo por artículo</h3>
+        <p>El plan de este examen arrancó auditando el proyecto hermano con una restricción explícita del ingeniero: ningún estudiante puede tener estructura o solución igual a la de un compañero. De ese análisis salieron diez lecciones concretas, cada una con destino exacto en la constitución de El Kiosquito:</p>
+        <ol class="flow-steps">
+          <li><strong>Analizar por departamento real, no por módulo técnico</strong> — el ingeniero había rechazado el primer análisis de NexoStay por estar organizado en torno a los 8 módulos de software en vez de a los departamentos del negocio.</li>
+          <li><strong>Un "qué pasa si" no evaluado escondió un cobro duplicado real</strong> en NexoStay (dos módulos cobraban el mismo monto sin saberlo) — de ahí la disciplina de modelar explícitamente cuándo dos módulos tocan el mismo dato.</li>
+          <li><strong>Un módulo completo de arqueo de turno se rechazó</strong> en NexoStay por simular un proceso contable que nadie había pedido — nace directamente el Art. 8.6: "operativo" es estrictamente INSERT/UPDATE/DELETE o consulta puntual, nunca una aprobación simulada.</li>
+          <li>DuckDB implementa <code class="pill">UPDATE</code> como <code class="pill">DELETE</code>+<code class="pill">INSERT</code> interno y bloquea con FKs entrantes — un motivo técnico concreto (no solo de gusto) para reemplazarlo por PostgreSQL en este proyecto.</li>
+          <li>Una migración "recrear tabla" no idempotente corrompió irreversiblemente un catálogo de DuckDB en NexoStay.</li>
+          <li><code class="pill">docker-compose.yml</code> debe montar como volumen toda carpeta editada desde el host — nace el Art. 5.5.</li>
+          <li>Probar solo con datasets chiquitos esconde huecos que solo aparecen a escala real — nace el Art. 8.3 ("todo dato se trata como producción real").</li>
+          <li>Un <code class="pill">;</code> dentro de un comentario SQL rompió el parser de fixtures de NexoStay para <strong>todos</strong> los tests a la vez.</li>
+          <li>Dos patrones distintos de generación de ID (secuencia de base de datos vs. <code class="pill">MAX+1</code>) causaron un "Duplicate key" silencioso.</li>
+          <li>La retroalimentación externa del ingeniero, probando la app real, encontró más huecos de alcance que toda la revisión interna combinada — razón directa de por qué este proyecto corrió sus propias auditorías de cobertura antes de llegar a esa instancia.</li>
+        </ol>
+
+        <div class="callout callout--dato">
+          <span class="tag">Qué se replicó del stack de NexoStay y qué no</span>
+          <p><strong>Se mantuvo</strong>: ClickHouse para la capa táctica (nunca dio problemas documentados), pandas/numpy/scikit-learn para la capa estratégica, Docker Compose, y la estructura de Speckit. <strong>Se reemplazó, con motivo técnico explícito</strong>: DuckDB + PocketBase → <strong>PostgreSQL</strong> (un kiosco tiene mucha más escritura concurrente por turno — venta tras venta, descuento de stock, cuadre de caja — que un hotel, y los bugs de DuckDB documentados arriba pesarían más ahí). Bootstrap 5 + Chart.js → <strong>React 18 + TypeScript + Vite + Tailwind + Framer Motion + Recharts</strong> (enmienda v1.3.0, decisión de producto del dueño: "Bootstrap produce interfaces reconociblemente iguales entre sí, y el proyecto necesita carácter propio").</p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 02 — CONSTITUCIÓN -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="constitucion">
+        <span class="eyebrow">Capítulo 02</span>
+        <h2>La Constitución: las reglas que nadie puede romper</h2>
+        <p class="dek">Un solo documento, hoy en su versión <strong>1.6.0</strong>, que rige transversalmente los once módulos. Ningún <code class="pill">spec.md</code> puede contradecirlo, y solo se cambia con una enmienda formal, numerada y registrada.</p>
+
+        <p>Tiene <strong>trece artículos</strong> — dos más que su proyecto hermano, porque el 12 y el 13 no existían en el diseño original y nacieron de auditorías reales sobre el propio proyecto, no de una lista de buenas intenciones escrita de antemano:</p>
+
+        <ol>
+          <li><strong>Art. 1 — Propósito y alcance.</strong> Rige todo el proyecto; ningún spec de módulo puede contradecirlo. Debe leerse antes que cualquier spec.</li>
+          <li><strong>Art. 2 — Identidad y modelo de negocio.</strong> El Kiosquito es una cadena <em>propia</em> de minimarkets de barrio — la empresa es dueña y opera directamente todas sus sucursales, nunca una plataforma de intermediación con terceros afiliados (a diferencia de NexoStay). El ingreso es margen de venta directa, nunca comisión. Las tres capas de datos (operativa, táctica, estratégica) conviven sin mezclarse.</li>
+          <li><strong>Art. 3 — Modelo de roles.</strong> Cuatro roles fijos: Dueño/Gerencia General, Encargado de Compras, Encargado de Sucursal, Cajero/Vendedor. El alcance de cada rol es un <em>dato</em> del catálogo <code class="pill">rol</code>, nunca una lista de códigos escrita a mano en el código de control de acceso.</li>
+          <li><strong>Art. 4 — Reglas de negocio no negociables.</strong> IVA 15% parametrizable; toda merma con causa obligatoria de un catálogo de cuatro causas; toda compra por oferta debe consultar el pronóstico de demanda antes de confirmarse; toda demanda insatisfecha se registra en el momento; el valor de un cliente nunca se mide solo por gasto acumulado.</li>
+          <li><strong>Art. 5 — Stack tecnológico obligatorio.</strong> El más largo, con diez incisos: PostgreSQL + ClickHouse + Airflow + FastAPI (API REST JSON pura) + React/TypeScript/Vite/Tailwind + Docker Compose + pandas/numpy/scikit-learn con exactamente <strong>cinco</strong> modelos comprometidos + versiones exactas sin rangos abiertos + RBAC por JWT + un asistente conversacional exclusivo del Dueño sobre OpenRouter.</li>
+          <li><strong>Art. 6 — Nomenclatura.</strong> Códigos únicos y trazables por nivel (<code class="pill">OE-N</code> / <code class="pill">OT-N.N</code> / <code class="pill">OO-[ABR]NN</code>) y por requisito (<code class="pill">RF-[ABR]-NNN</code>, <code class="pill">RN-</code>, <code class="pill">RNF-</code>, <code class="pill">CA-</code>, <code class="pill">US-</code>); endpoints en español, orientados a recurso.</li>
+          <li><strong>Art. 7 — Estándares de calidad.</strong> ISO/IEC/IEEE 29148 para la forma de todo requisito, ISO/IEC 25010 para requisitos no funcionales, ISO/IEC 25012 para calidad de datos analíticos.</li>
+          <li><strong>Art. 8 — Restricciones generales.</strong> Pagos simulados pero con lógica de cobro/margen/IVA persistida como real; todo dato se trata como producción, sin categoría de "prueba"; notificaciones reales con tier gratuito; y el <strong>Art. 8.6</strong>, nacido directo de NexoStay: ningún módulo puede simular un flujo de aprobación no pedido explícitamente.</li>
+          <li><strong>Art. 9 — Gobernanza.</strong> Solo se enmienda con versión numerada y registro del cambio propagado a toda spec dependiente.</li>
+          <li><strong>Art. 10 — Protección de datos (LOPDP de Ecuador).</strong> Consentimiento explícito con fecha/hora/versión de política; mecanismo ARCO; notificación de brecha a la APDP en 72 horas; nunca se guarda el número completo de tarjeta ni el CVV — solo los últimos 4 dígitos, en línea directa con el hallazgo del enunciado sobre clonación de tarjetas y responsabilidad legal.</li>
+          <li><strong>Art. 11 — Diseño visual y experiencia de usuario.</strong> Paleta oficial con valores hex y ratios de contraste verificados (ver Capítulo 08), tipografía Fraunces + Inter, y desde la v1.6.0 un isotipo propio.</li>
+          <li><strong>Art. 12 — Métricas y umbrales de la cascada de objetivos.</strong> Fija en un solo lugar cada meta cuantitativa del proyecto: margen bruto +8% trimestral, merma &lt;5% anual, tiempo de cobro &lt;90s, ≥5 modelos de ML en producción, latencia del ETL &lt;10 min/ciclo, y una veintena más.</li>
+          <li><strong>Art. 13 — Datos maestros y catálogos.</strong> El artículo más nuevo (v1.2.0) y el más citado en el resto de este documento — nueve incisos que fijan cómo se cataloga un campo de vocabulario cerrado, cuándo no corresponde catalogarlo, y por qué. Capítulo 04 completo dedicado a esto.</li>
+        </ol>
+
+        <h3 class="sub">Historial de enmiendas: seis versiones en tres días, cada una con un motivo real</h3>
+        <table class="role-table">
+          <thead><tr><th>Versión</th><th>Qué cambió</th><th>Motivo real</th></tr></thead>
+          <tbody>
+            <tr><td><code>1.0.0</code></td><td>Versión original</td><td>—</td></tr>
+            <tr><td><code>1.1.0</code></td><td>De 3 a 5 modelos de ML; se agrega el asistente conversacional (Art. 5.10), inicialmente sobre la API de Anthropic</td><td>Ampliar la capa de IA más allá del mínimo original</td></tr>
+            <tr><td><code>1.2.0</code></td><td>Nuevo Art. 13; reescritura del Art. 4.2 y 3.3; corrección del Art. 12.1; numeración de Art. 5 reordenada</td><td><strong>Verificación cruzada</strong> de los 11 módulos: 3 desviaciones en specs + <strong>7 fallas reales en la constitución misma</strong> — incluida una contradicción de versión (el propio Art. 9.2 decía "v1.0.0" mientras otros artículos ya citaban "enmendado en v1.1.0")</td></tr>
+            <tr><td><code>1.3.0</code></td><td>Backend a API REST JSON pura; frontend a React+TS+Vite+Tailwind+Framer Motion+Recharts</td><td>Decisión de producto del dueño — carácter visual propio, no genérico</td></tr>
+            <tr><td><code>1.4.0</code></td><td>Proveedor del asistente conversacional: Anthropic → <strong>OpenRouter</strong> (<code>nvidia/nemotron-3.5-lightning:free</code>)</td><td>Presupuesto — el equipo no tiene acceso pago a la API de Anthropic</td></tr>
+            <tr><td><code>1.5.0</code></td><td>Paleta semántica: éxito y advertencia reajustados</td><td>Auditoría WCAG 2.1 AA real: advertencia medía 2,82:1 contra su fondo, por debajo incluso del mínimo de texto grande</td></tr>
+            <tr><td><code>1.6.0</code></td><td>Color primario de verde esmeralda a amarillo/ámbar dorado; nuevo isotipo propio (Art. 11.1-bis)</td><td>El verde original se parecía demasiado al de otro proyecto del curso — pedido explícito del dueño</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--leccion">
+          <span class="tag">La falla más delicada de las siete de la v1.2.0</span>
+          <p>El propio Art. 9.2 declaraba "Versión 1.0.0" mientras los Art. 5.6 y 5.10 ya decían explícitamente "enmendado en v1.1.0". El documento afirmaba ser una versión y a la vez contener el contenido de otra — justo la clase de inconsistencia que el propio Art. 9.1 existe para evitar. Se corrigió convirtiendo el Art. 9.2 en un historial real de versiones, la misma tabla que está arriba.</p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 03 — ARQUITECTURA -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="arquitectura">
+        <span class="eyebrow">Capítulo 03</span>
+        <h2>Arquitectura técnica: tres capas que nunca se mezclan</h2>
+        <p class="dek">Postgres para operar, ClickHouse para entender un día o un mes, pandas/scikit-learn para entender toda la red. El Art. 2.5 de la constitución lo fija como principio, no como detalle de implementación.</p>
+
+        <h3 class="sub">Capa operativa (OLTP) — PostgreSQL 16</h3>
+        <p>Todas las tablas transaccionales viven acá: ventas, inventario, compras, clientes, mermas, cuadre de caja, autenticación. El backend es <strong>FastAPI + Python 3.11, exclusivamente API REST JSON</strong> (desde la enmienda v1.3.0, ninguna ruta renderiza HTML). Organizado en <strong>once routers</strong> sobre los once contratos OpenAPI, con <code class="pill">app/core/</code> compartido por todos: <code class="pill">config.py</code> (JWT expira a las 8 horas, un turno de caja completo), <code class="pill">security.py</code> (bcrypt + PyJWT), <code class="pill">deps.py</code> (<code class="pill">require_permission</code> consulta la tabla <code class="pill">permiso_rol</code> en base de datos, nunca compara contra un código de rol escrito a mano) y <code class="pill">services/scoping.py</code> (<code class="pill">verificar_alcance_sucursal</code>, resuelto siempre contra base de datos, nunca contra los claims del JWT solamente).</p>
+        <p>El estado final: <strong>79 tablas</strong>, <strong>32 catálogos maestros sembrados por migración</strong> (33 tras la última enmienda), una matriz <code class="pill">permiso_rol</code> con <strong>300 filas</strong>, once routers, alrededor de <strong>114 endpoints</strong>, y trece migraciones Alembic en la base.</p>
+
+        <h3 class="sub">Capa táctica (OLAP) — ClickHouse, esquema en estrella</h3>
+        <p>Postgres es la fuente; ClickHouse es copia transformada — "nunca la verdad", nadie escribe ahí a mano. Alimentada por Airflow con cargas incrementales por sucursal. El esquema tiene <strong>12 dimensiones</strong> (<code class="pill">dim_tiempo</code>, <code class="pill">dim_hora</code>, <code class="pill">dim_sucursal</code>, <code class="pill">dim_producto</code> con SCD tipo 2, <code class="pill">dim_cliente</code> con SCD tipo 2, y siete más) y <strong>9 tablas de hechos</strong> (<code class="pill">fact_venta_linea</code>, <code class="pill">fact_merma</code>, <code class="pill">fact_cuadre_caja</code>, <code class="pill">fact_stock_diario</code>, y cinco más). Motores: <code class="pill">MergeTree</code> para hechos de alto volumen (particionados por mes), <code class="pill">ReplacingMergeTree</code> para dimensiones (permite reprocesar sin duplicar).</p>
+
+        <div class="callout callout--dato">
+          <span class="tag">La decisión de diseño más importante de todo el modelo</span>
+          <p>En <code class="pill">fact_venta_linea</code>, <code class="pill">costo_reposicion_vigente</code> se resuelve consultando <code class="pill">historial_costo_producto</code> con la fecha exacta de la venta, y se <strong>congela</strong> en la fila. Si el margen se recalculara contra el costo actual del producto, cada subida de precio de un proveedor distorsionaría todo el margen histórico ya reportado — el KPI de margen +8% trimestral (OT1.1) terminaría midiendo algo que nunca ocurrió.</p>
+        </div>
+
+        <h3 class="sub">Capa estratégica — pandas, NumPy, scikit-learn</h3>
+        <p>Compara y agrega el desempeño de toda la red de sucursales entre sí — los cinco modelos de machine learning del Art. 5.6 viven acá (Capítulo 07).</p>
+
+        <h3 class="sub">El pipeline ETL, paso a paso</h3>
+        <ol class="flow-steps">
+          <li>Cada DAG registra su corrida en <code class="pill">ejecucion_pipeline_etl</code> al iniciar y al terminar — la métrica base directa del KPI de OT3.6 (latencia &lt;10 min/ciclo) es literalmente esa diferencia de tiempos.</li>
+          <li><code class="pill">dim_tiempo</code>/<code class="pill">dim_hora</code> se generan una sola vez, en una tarea de inicialización — son las únicas dos dimensiones sin origen directo en PostgreSQL.</li>
+          <li>Las dimensiones se cargan siempre antes que los hechos: un hecho contra una dimensión todavía no cargada produce huecos silenciosos en cualquier reporte que la use.</li>
+          <li>Los atributos copiados desde los 32-33 catálogos maestros se leen de PostgreSQL en cada corrida — nunca quedan como constantes hardcodeadas dentro del DAG.</li>
+          <li>Cada corrida valida su propia carga en <code class="pill">validacion_calidad_datos</code>: sin <code class="pill">producto_id</code> nulo, totales de <code class="pill">fact_venta_linea</code> cuadrando contra Postgres, ninguna fila de hecho apuntando a una dimensión que no existe.</li>
+          <li>Reprocesar un día es idempotente: se borra la partición del mes afectado (con el literal de partición sin comillas — bug real encontrado y corregido, ver Capítulo 09) y se recarga entera.</li>
+        </ol>
+        <p>Un tercer DAG, dedicado exclusivamente al entrenamiento de los 5 modelos, corre <code class="pill">@monthly</code> — separado a propósito del DAG diario de agregados, porque el volumen de datos de un kiosco no cambia noche a noche y reentrenar cada madrugada solo generaría versiones ruidosas sin ningún cambio real de negocio detrás.</p>
+
+        <figure class="diagram-fig">
+          <div class="svg-wrap">
+            <svg width="100%" viewBox="0 0 680 460" role="img" xmlns="http://www.w3.org/2000/svg">
+              <defs><marker id="arrowk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#96917A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+              <g stroke="#96917A" stroke-width="1.5" fill="none">
+                <line x1="135" y1="96" x2="340" y2="140" marker-end="url(#arrowk)"/>
+                <line x1="340" y1="96" x2="340" y2="140" marker-end="url(#arrowk)"/>
+                <line x1="545" y1="96" x2="340" y2="140" marker-end="url(#arrowk)"/>
+                <line x1="340" y1="196" x2="340" y2="240" marker-end="url(#arrowk)"/>
+                <line x1="340" y1="296" x2="135" y2="340" marker-end="url(#arrowk)"/>
+                <line x1="340" y1="296" x2="340" y2="340" marker-end="url(#arrowk)"/>
+                <line x1="340" y1="296" x2="545" y2="340" marker-end="url(#arrowk)"/>
+                <line x1="135" y1="396" x2="135" y2="440" marker-end="url(#arrowk)" stroke-dasharray="3 3"/>
+                <line x1="340" y1="396" x2="340" y2="440" marker-end="url(#arrowk)" stroke-dasharray="3 3"/>
+              </g>
+              <g font-family="Inter, sans-serif">
+                <g><rect x="40" y="40" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="135" y="58" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">Cajero</text><text x="135" y="76" text-anchor="middle" font-size="11" fill="#7A745E">POS en la sucursal</text></g>
+                <g><rect x="245" y="40" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="340" y="58" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">Encargados</text><text x="340" y="76" text-anchor="middle" font-size="11" fill="#7A745E">Sucursal / Compras</text></g>
+                <g><rect x="450" y="40" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="545" y="58" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">Dueño</text><text x="545" y="76" text-anchor="middle" font-size="11" fill="#7A745E">Dashboard + asistente</text></g>
+                <g><rect x="230" y="140" width="220" height="56" rx="8" fill="#F8F1DD" stroke="#C9B08A"/><text x="340" y="158" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">nginx</text><text x="340" y="176" text-anchor="middle" font-size="11" fill="#7A745E">Build de Vite + proxy</text></g>
+                <g><rect x="230" y="240" width="220" height="56" rx="8" fill="#F8F1DD" stroke="#C9B08A"/><text x="340" y="258" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">FastAPI</text><text x="340" y="276" text-anchor="middle" font-size="11" fill="#7A745E">11 routers · API REST</text></g>
+                <g><rect x="40" y="340" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="135" y="358" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">PostgreSQL</text><text x="135" y="376" text-anchor="middle" font-size="11" fill="#7A745E">79 tablas · operativa</text></g>
+                <g><rect x="245" y="340" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="340" y="358" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">Airflow</text><text x="340" y="376" text-anchor="middle" font-size="11" fill="#7A745E">3 DAGs · orquesta ETL</text></g>
+                <g><rect x="450" y="340" width="190" height="56" rx="8" fill="none" stroke="#C9B08A"/><text x="545" y="358" text-anchor="middle" font-size="14" font-weight="600" fill="#3D2E00">OpenRouter</text><text x="545" y="376" text-anchor="middle" font-size="11" fill="#7A745E">única dependencia externa</text></g>
+                <g><rect x="40" y="440" width="190" height="0" rx="8" fill="none" stroke="none"/></g>
+                <g><rect x="245" y="440" width="0" height="0" fill="none" stroke="none"/></g>
+              </g>
+              <g font-family="Inter, sans-serif">
+                <rect x="40" y="440" width="0" height="0"/>
+              </g>
+              <g font-family="Inter, sans-serif">
+                <rect x="40" y="440" width="0" height="0"/>
+              </g>
+              <g font-family="Inter, sans-serif">
+                <rect x="40" y="440" width="0" height="0"/>
+              </g>
+            </svg>
+          </div>
+          <figcaption>El viaje de una venta: nginx recibe, FastAPI valida y delega a un service, el service escribe en PostgreSQL. El pipeline de Airflow (abajo, líneas punteadas) lee PostgreSQL en un ciclo aparte y alimenta ClickHouse, de donde salen los tres reportes del dashboard del Dueño y las 8 tools del asistente conversacional.</figcaption>
+        </figure>
+
+        <div class="callout callout--leccion">
+          <span class="tag">Bugs reales de ClickHouse, encontrados corriendo contra motores reales</span>
+          <p>Diez hallazgos concretos durante la verificación del ETL, dos de ellos <strong>solo visibles con Docker real</strong> en la máquina del usuario, nunca contra los motores nativos del entorno de desarrollo: el usuario <code class="pill">default</code> de la imagen oficial <code class="pill">clickhouse-server:24.8</code> necesita contraseña explícita — sin ella, <code class="pill">clickhouse-driver</code> fallaba con <code class="pill">Code: 516. Authentication failed</code> desde los contenedores de Airflow aunque el cliente de línea de comandos sí conectara; y <code class="pill">CLICKHOUSE_DB</code> no alcanza para que los scripts de inicialización creen tablas en la base correcta, porque cada archivo de init corre en su propia sesión — el preámbulo <code class="pill">CREATE DATABASE... USE...</code> hay que repetirlo en cada archivo. Otros ocho aparecieron ya en el sandbox: de <code class="pill">clickhouse_connect</code> incompatible con la versión 18 a columnas <code class="pill">Nullable</code> ilegales como clave de ordenamiento, pasando por particiones que revientan si el literal numérico va entre comillas.</p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 04 — CATÁLOGOS Y DATASET REAL -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="catalogos">
+        <span class="eyebrow">Capítulo 04</span>
+        <h2>Catálogos maestros y el dataset real: la base de datos puesta a prueba</h2>
+        <p class="dek">Ningún informe puede ser mejor que los datos que lo sostienen. Antes de dar por buena la base de datos, se hicieron dos ejercicios concretos: barrer los once módulos buscando vocabulario de negocio escrito como texto libre, y comparar el esquema completo contra un sistema de punto de venta real y en producción.</p>
+
+        <h3 class="sub">El hallazgo que disparó todo: una categoría de producto en texto libre</h3>
+        <p>La tabla <code class="pill">producto</code> tenía originalmente <code class="pill">categoria TEXT NOT NULL</code>. Si un cajero escribe "Bebidas", otro "bebidas" y un tercero "BEBIDAS", cualquier agregación por categoría devuelve tres filas distintas para lo mismo — y la respuesta a "¿cuál es mi categoría más rentable?" queda, literalmente, mal calculada. Ese único hallazgo escaló a una revisión completa de los once <code class="pill">data-model.md</code>, que encontró dos clases de problema: <strong>texto libre sin control</strong> (5 campos, incluida la categoría) y <strong>CHECK cerrado pero sin tabla</strong> (27 campos con estados como <code class="pill">'pendiente'</code>/<code class="pill">'aceptada'</code> — correctos para la operativa diaria, pero imposibles de consultar como catálogo o de colgarles un atributo).</p>
+
+        <h3 class="sub">Resultado: 33 catálogos maestros nuevos, repartidos por módulo</h3>
+        <div class="table-scroll">
+        <table class="role-table">
+          <thead><tr><th>Módulo</th><th>Catálogos nuevos</th></tr></thead>
+          <tbody>
+            <tr><td>001 Core Ventas e Inventario</td><td>5</td></tr>
+            <tr><td>002 Clientes y Fidelización</td><td>1 (+ SCD2 de segmento)</td></tr>
+            <tr><td>003 Precios y Márgenes</td><td>5 (incluye <code>fuente_competencia</code>, agregado al detectarse durante la ejecución)</td></tr>
+            <tr><td>004 Pronóstico de Demanda</td><td>1</td></tr>
+            <tr><td>005 Promociones Inteligentes</td><td>3</td></tr>
+            <tr><td>006 Caja, Mermas y Fraude</td><td>5</td></tr>
+            <tr><td>007 Pagos y Seguridad</td><td>1</td></tr>
+            <tr><td>008 Compras y Proveedores</td><td>2</td></tr>
+            <tr><td>009 Expansión y Sucursales</td><td>2</td></tr>
+            <tr><td>010 Administración</td><td>5</td></tr>
+            <tr><td>011 Analítica y Reportes</td><td>3</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3 class="sub">La convención de clave natural</h3>
+        <p>Los catálogos usan <strong>código de negocio en <code class="pill">VARCHAR</code> como llave primaria</strong>, no un entero autoincremental — el dato queda legible sin JOIN, el código de servicio que compara contra el código no cambia, y una migración no reescribe filas. La única excepción son los catálogos cuyos nombres edita el propio negocio y necesitan autorreferencia jerárquica (<code class="pill">categoria</code>, con hasta dos niveles: padre → subcategoría).</p>
+
+        <p>El atributo más importante de toda la enmienda es <code class="pill">causa_merma.es_atribuible_a_persona</code>: separa robo externo y caducidad (nadie responsable) de error humano y fraude interno (sí lo hay) — sin ese campo, el cruce merma × cuadre de caja que exige el objetivo táctico OT3.4 tendría que enumerar códigos a mano en cada consulta, y bastaría con olvidar uno para que un informe de fraude interno mintiera sin avisar.</p>
+
+        <div class="callout callout--dato">
+          <span class="tag">Qué deliberadamente NO se catalogó</span>
+          <p>Catalogar no es gratis, y el Art. 13.8 es explícito sobre cuándo no corresponde: campos cuyo conjunto de valores <strong>crece con el propio desarrollo del sistema</strong>, donde una entrada no registrada rompería la función del campo — <code class="pill">log_auditoria.accion</code> (crece con cada endpoint nuevo), las reglas del pipeline de validación de calidad, o los campos de justificación en texto libre que exige el Art. 5.6 para cuando un modelo de IA no tiene datos suficientes. El Art. 13.6 agrega otro límite: un catálogo no es licencia para ampliar el sistema — insertar una fila nueva en el catálogo de roles no incorpora un rol quinto al sistema, sigue exigiendo una enmienda formal.</p>
+        </div>
+
+        <h3 class="sub">La comparación contra un dataset real: opensourcepos</h3>
+        <p>En vez de un CSV suelto (la mayoría, tablas planas sin relaciones, poco útiles para una comparación de esquema real), se comparó contra <strong>opensourcepos</strong>: un sistema de punto de venta open-source real, en producción activa desde hace más de quince años, usado por tiendas pequeñas y minimarkets — el caso de uso más parecido encontrado con un esquema relacional completo y documentado (27 tablas base).</p>
+
+        <p>La comparación encontró cuatro gaps reales frente al modelo original de El Kiosquito: un número de comprobante de venta distinto del id interno, un umbral de stock mínimo para alertar reposición, la forma de pago y el número de factura del proveedor en cada recepción de compra, y un estado de "venta en espera" para pausar y retomar un cobro. De esos cuatro, los dos primeros se incorporaron efectivamente al modelo real en enmiendas posteriores; los otros dos —trazabilidad de pago a proveedor y venta en espera— quedaron identificados pero, según las auditorías de cierre, sin una decisión final documentada de "se construye" o "se descarta formalmente" (ver Capítulo 09).</p>
+
+        <div class="callout callout--leccion">
+          <span class="tag">Dónde El Kiosquito termina superando al POS real</span>
+          <p>No fue una comparación en un solo sentido. El modelo de El Kiosquito tiene piezas que <strong>opensourcepos no modela en absoluto</strong>: fecha de caducidad y lotes (<code class="pill">lote_producto</code>), historial de costo/precio <em>append-only</em> auditable en vez de un valor único mutable, validación de pronóstico de demanda antes de aceptar una compra por oferta, ciclo de vida completo de apertura de sucursal con checklist y herencia de catálogo, y cuadre de caja con detección de fraude vía Isolation Forest. Y, con la misma honestidad, quedó registrado qué patrones del POS real se evaluaron y se descartaron a propósito: combos de productos, atributos flexibles tipo EAV, tarjetas de regalo, impuestos múltiples por línea (Ecuador tiene una tasa de IVA nacional única) — ninguno respaldado por un objetivo táctico real del proyecto.</p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 05 — MÓDULOS -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="modulos">
+        <span class="eyebrow">Capítulo 05</span>
+        <h2>Los once módulos, uno por uno</h2>
+        <p class="dek">Cada uno resuelve el ciclo de vida completo de una porción del negocio. Juntos cubren todo el kiosco: desde que un cliente pide algo en el mostrador hasta que el dueño le pregunta al sistema, en lenguaje natural, qué sucursal tuvo más merma este mes.</p>
+
+        <div class="module-card" id="mod-001">
+          <div class="module-head"><span class="code">001 · CVI</span><h4>Core de Ventas e Inventario</h4></div>
+          <span class="role-chip">Actor: cajero, encargado de sucursal</span>
+          <p>El módulo núcleo: junta la venta (<code class="pill">venta</code>/<code class="pill">detalle_venta</code>) con el catálogo y el stock que la hacen posible. Cada venta calcula IVA al 15% y, para productos fraccionables (queso, embutidos por peso), convierte automáticamente la cantidad a unidad de inventario usando un factor de conversión — nunca a mano. Una venta anulada nunca se borra, queda marcada <code class="pill">anulada</code> para siempre.</p>
+          <p>El stock se ajusta con motivo obligatorio y nunca puede quedar negativo; un producto perecedero genera un <code class="pill">lote_producto</code> propio por cada ingreso con fecha de caducidad distinta; y un proceso batch —nunca manual— marca automáticamente el stock "sin rotación" cuando un producto deja de venderse, desmarcándolo solo si vuelve a moverse.</p>
+          <div class="callout callout--dato">
+            <span class="tag">Detalle técnico</span>
+            <p>El <code class="pill">CHECK</code> original que validaba el subtotal de una línea comparaba una escala numérica de 5 decimales contra una de 2 — rechazaba cualquier venta fraccionaria con cantidad no entera, justo el caso de uso central de "vender por peso". Se corrigió en una migración dedicada tras confirmarlo con un error real de Postgres, no en teoría.</p>
+          </div>
+        </div>
+
+        <div class="module-card" id="mod-002">
+          <div class="module-head"><span class="code">002 · FC</span><h4>Clientes y Fidelización</h4></div>
+          <span class="role-chip">Actor: encargado de fidelización</span>
+          <p>Dueño de <code class="pill">cliente</code> y del historial de segmentación de valor y riesgo de abandono que producen los modelos de IA. La segmentación es SCD tipo 2: registrar un segmento nuevo cierra automáticamente, en la misma transacción, la vigencia del anterior — un índice único parcial impide que un cliente tenga dos segmentos vigentes a la vez, impuesto en base de datos, no solo en la aplicación.</p>
+          <p>Antes de una campaña de recuperación se exige, desde la auditoría de cierre, que <code class="pill">evaluacion_churn.es_riesgo_real</code> sea verdadero — no basta con que el cliente no haya vuelto a comprar; tiene que tratarse de un riesgo real de abandono, no de su ciclo normal de compra (409 si no lo es). Toda alta de cliente exige consentimiento LOPDP explícito con fecha, hora y versión de política.</p>
+        </div>
+
+        <div class="module-card" id="mod-003">
+          <div class="module-head"><span class="code">003 · PM</span><h4>Precios y Márgenes</h4></div>
+          <span class="role-chip">Actor: encargado de precios</span>
+          <p>Dueño del precio vigente por producto y sucursal, del margen real (contra el costo de reposición de 008) y del motor de pricing dinámico. Ese motor <strong>nunca aplica un precio solo</strong> — genera una recomendación <code class="pill">pendiente</code> que un humano acepta o rechaza; si se cambia el precio a mano mientras hay una recomendación pendiente, esta pasa automáticamente a <code class="pill">obsoleta</code>.</p>
+          <p>La clasificación comercial "gancho" (margen bajo, alta rotación) o "nicho" (margen alto) es SCD tipo 2, con motivo de mínimo 10 caracteres. Desde la auditoría de cierre, aceptar una recomendación que deje el precio por debajo del costo de reposición <strong>advierte, pero no bloquea</strong> — vender a pérdida un producto gancho puede ser, a veces, una decisión de negocio legítima.</p>
+        </div>
+
+        <div class="module-card" id="mod-004">
+          <div class="module-head"><span class="code">004 · PD</span><h4>Pronóstico de Demanda</h4></div>
+          <span class="role-chip">Actor: cajero (captura), encargado de compras (consulta)</span>
+          <p>Sin demanda insatisfecha capturada en el mostrador no hay dato de entrada para entrenar nada: cuando un cliente pide algo sin stock, el cajero lo registra en menos de 10 segundos, sin necesidad de venta asociada. El modelo descuenta explícitamente cinco confusores documentados: demanda insatisfecha, sustitutos ofrecidos/aceptados, promociones pasadas, estacionalidad de quincena, y eventos locales (feriados, fiestas patronales, clima extremo).</p>
+          <p>Si nunca se calculó el pronóstico de un producto/sucursal, la respuesta declara explícitamente <code class="pill">datos_suficientes: false</code> — nunca se inventa una cantidad recomendada.</p>
+        </div>
+
+        <div class="module-card" id="mod-005">
+          <div class="module-head"><span class="code">005 · PI</span><h4>Promociones Inteligentes</h4></div>
+          <span class="role-chip">Actor: encargado de fidelización</span>
+          <p>Dueño del ciclo de vida del cupón (<code class="pill">activo</code> → <code class="pill">canjeado</code>/<code class="pill">expirado</code>) con tres orígenes posibles: cumpleaños, patrón de compra, o recuperación de churn. Un cupón de recuperación siempre exige su <code class="pill">evaluacion_churn_id</code> asociado, validado dos veces a propósito — como CHECK de base de datos y como atributo consultable del catálogo.</p>
+          <div class="callout callout--leccion">
+            <span class="tag">El hallazgo más señalado de las auditorías</span>
+            <p>El catálogo declaraba <code class="pill">patron_compra.es_automatico: true</code>, pero <strong>ningún modelo de los cinco comprometidos detectaba patrones de compra</strong> — el disparo era 100% manual. No era un bug de implementación: el motor directamente no existía. Se construyó un motor real de análisis de canasta de mercado (soporte/confianza/lift) en SQL + Python puro, probado con resultados exactos (soporte 0.3333, confianza 0.6154, lift 1.8462) sobre datos sintéticos — y durante esa misma prueba se encontró y corrigió un bug propio: sin un <code class="pill">SAVEPOINT</code> por cada intento de inserción, un duplicado descartaba sugerencias ya generadas en la misma corrida.</p>
+          </div>
+        </div>
+
+        <div class="module-card" id="mod-006">
+          <div class="module-head"><span class="code">006 · CMF</span><h4>Caja, Mermas y Fraude</h4></div>
+          <span class="role-chip">Actor: cajero (turno), encargado de prevención de pérdidas</span>
+          <p>Un cajero abre turno con monto inicial declarado y lo cierra con monto contado — la diferencia contra lo esperado (calculada siempre por el servidor, nunca estimada por el frontend) exige motivo obligatorio, incluso si es "sin causa identificada". Nunca puede haber dos turnos abiertos a la vez para el mismo cajero.</p>
+          <p>Cada hora, automáticamente, se genera un snapshot del monto esperado acumulado de cada turno abierto — insumo de granularidad fina para el modelo de detección de anomalías, y nadie, ni siquiera el dueño, puede crear uno a mano. Una merma se detecta primero y se clasifica después: el resultado de investigación (confirmada/descartada) solo se acepta si ya tiene causa asignada.</p>
+          <p>Las alertas de fraude en pago nacen desde <strong>001</strong> al momento de la venta — el único caso de escritura cruzada entre módulos de todo el proyecto, documentado como excepción explícita — y se atienden desde acá, sin nunca almacenar el número completo de tarjeta.</p>
+        </div>
+
+        <div class="module-card" id="mod-007">
+          <div class="module-head"><span class="code">007 · PS</span><h4>Pagos y Seguridad</h4></div>
+          <span class="role-chip">Actor: encargado de prevención de pérdidas y seguridad</span>
+          <p>Distinto de 006 en el enfoque: mientras 006 investiga pérdidas ya ocurridas, 007 es preventivo — vigila que la infraestructura de cobro con tarjeta esté vigente sin depender de que ya haya pasado un incidente. Cada revisión de un datáfono agrega una fila nueva a un historial <em>append-only</em>; nunca se sobrescribe una revisión anterior, y un datáfono sin ninguna revisión <strong>nunca cuenta como conforme</strong> en el indicador — contarlo inflaría el KPI justo en el caso más riesgoso.</p>
+          <div class="callout callout--dato">
+            <span class="tag">El hallazgo con más peso legal de todo el proyecto</span>
+            <p>El sistema sabía que un datáfono estaba vencido, pero no podía impedir ni trazar que se usara igual para cobrar — exactamente el escenario de responsabilidad legal que describe el enunciado original del examen (clonación de tarjeta por datáfono desactualizado). Se corrigió agregando <code class="pill">venta.datafono_id</code> con validación de que exista, pertenezca a la sucursal y esté activo, más un endpoint que calcula, para cada venta, el estado de revisión <strong>vigente en la fecha exacta de esa venta</strong> — nunca el estado actual del datáfono, para no atribuir retroactivamente una revisión posterior a una venta anterior.</p>
+          </div>
+        </div>
+
+        <div class="module-card" id="mod-008">
+          <div class="module-head"><span class="code">008 · CP</span><h4>Compras y Proveedores</h4></div>
+          <span class="role-chip">Actor: encargado de compras</span>
+          <p>Gestiona el ciclo completo de una orden: registro de proveedor, orden, recepción (que puede llegar en más de un envío — cada evento se suma, nunca se sobrescribe) y el historial de costos que alimenta el margen real de 003. El control más particular del departamento: una compra "por oferta" no puede confirmarse a ciegas sin haber consultado antes el pronóstico de demanda de 004 — si se compra igual en contra de la recomendación, hay que documentar por qué.</p>
+          <p>Nace directamente del escenario insignia del enunciado del examen: comprar 50 unidades de una edición limitada en oferta que después no se vendieron.</p>
+        </div>
+
+        <div class="module-card" id="mod-009">
+          <div class="module-head"><span class="code">009 · ES</span><h4>Expansión y Sucursales</h4></div>
+          <span class="role-chip">Actor: dueño</span>
+          <p>Dueño de <code class="pill">sucursal</code> y del proceso estructurado de apertura: un checklist fijo de 8 ítems, herencia de catálogo y precios base de la cadena (operación idempotente — un segundo intento sobre una sucursal ya heredada se rechaza sin duplicar precios), asignación de personal inicial, y activación. Activar una sucursal solo tiene éxito si los 8 ítems del checklist están completos, validado en la misma transacción que el cambio de estado — nunca solo del lado de la interfaz.</p>
+          <p>Un producto de la cadena sin ningún precio previo registrado en ninguna otra sucursal no recibe un precio heredado inventado: queda explícitamente "pendiente de fijación manual".</p>
+        </div>
+
+        <div class="module-card" id="mod-010">
+          <div class="module-head"><span class="code">010 · AD</span><h4>Administración</h4></div>
+          <span class="role-chip">Actor: dueño — módulo "guardián" transversal</span>
+          <p>Dueño de <code class="pill">usuario</code> y de toda la gobernanza de la cadena: autenticación, asignación de rol y sucursal, matriz de permisos, log de auditoría inmutable, parámetros globales versionados (una venta ya cerrada conserva la tasa de IVA que realmente aplicó, no la actual), y el mecanismo ARCO exigido por la LOPDP. Todos los demás módulos referencian <code class="pill">usuario</code> como llave foránea sin haberlo definido nunca — este módulo resuelve esa deuda de forma retroactiva.</p>
+          <p>La matriz de permisos se siembra por migración, nunca por endpoint de escritura: modificarla equivale a una enmienda formal de la jerarquía de roles del Art. 3. Ninguna contraseña se registra en texto plano, ni siquiera en el propio log de auditoría.</p>
+        </div>
+
+        <div class="module-card" id="mod-011">
+          <div class="module-head"><span class="code">011 · AR</span><h4>Analítica y Reportes (BI)</h4></div>
+          <span class="role-chip">Actor: dueño — dashboard + asistente conversacional</span>
+          <p>Registra la ejecución de cada ciclo del pipeline ETL, el entrenamiento de cada versión de los 5 modelos de ML (con la regla de honestidad mecanizada, Capítulo 07), y la auditoría completa de preguntas del asistente conversacional. Es el único módulo dueño de la conexión a ClickHouse — por eso también expone en caliente los tres reportes que el dashboard del Dueño necesita pintar: margen, merma y ticket promedio por sucursal, cada uno protegido por su propio recurso RBAC.</p>
+          <div class="callout callout--dato">
+            <span class="tag">El vacío arquitectónico que corrigió la enmienda v1.2</span>
+            <p>La regla general decía "los reportes compuestos se sirven desde ClickHouse, no desde la operativa" — pero eso fijaba <em>dónde</em>, no <em>por cuál puerta REST</em> llegaba esa respuesta al frontend. Al construir el Dashboard del Dueño se encontró que la única función que efectivamente consultaba ClickHouse era el catálogo de herramientas pensado para que el LLM eligiera cuál invocar — no para que una pantalla pintara tres tarjetas de KPI en cada carga. La enmienda agregó los tres endpoints REST dedicados, protegidos por un recurso RBAC genérico y traduciendo cualquier falla de ClickHouse a <code class="pill">502</code>, nunca a un <code class="pill">500</code> genérico, para que el frontend distinga "no tengo permiso" de "no hay datos disponibles ahora".</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 06 — ROLES -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="roles">
+        <span class="eyebrow">Capítulo 06</span>
+        <h2>Roles y autenticación de punta a punta</h2>
+        <p class="dek">Cuatro roles, una sola credencial por persona, y el alcance de cada uno resuelto siempre contra la base de datos — nunca contra un literal escrito a mano en el código.</p>
+
+        <table class="role-table">
+          <thead><tr><th>Rol</th><th>Alcance</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Dueño / Gerencia General</strong></td><td>Toda la red. Define precios base, aprueba aperturas de sucursal, consulta la analítica estratégica y el asistente conversacional. No opera el registro diario.</td></tr>
+            <tr><td><strong>Encargado de Compras</strong></td><td>Rol corporativo, toda la red. Proveedores, órdenes de compra, costo de reposición.</td></tr>
+            <tr><td><strong>Encargado de Sucursal</strong></td><td>Una o varias sucursales asignadas. Precios locales, inventario, caducidad, fidelización y prevención de pérdidas — solo de sus propias sucursales.</td></tr>
+            <tr><td><strong>Cajero / Vendedor</strong></td><td>Una sucursal específica. Ventas, cobros, cuadre de caja, demanda insatisfecha.</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="sub">El viaje completo de una sesión</h3>
+        <ol class="flow-steps">
+          <li>El usuario manda correo y contraseña; el servidor compara contra el hash guardado con <strong>bcrypt</strong> — nunca en texto plano, ni siquiera el propio sistema puede "leer" la contraseña original, solo verificar si una coincide.</li>
+          <li>Si coincide, se emite un <strong>JWT</strong> con claims de rol y sucursal(es) asignada(s), válido por 8 horas — la duración exacta de un turno de caja.</li>
+          <li>En cada petición protegida, <code class="pill">require_permission</code> consulta la matriz <code class="pill">permiso_rol</code> real en base de datos — 300 filas sembradas por migración, nunca comparada contra un literal de rol en el código.</li>
+          <li>Sobre esa identidad se monta el control de alcance: si el rol es de cadena completa (dueño, encargado de compras), pasa; si es de sucursal (encargado de sucursal, cajero), <code class="pill">verificar_alcance_sucursal</code> compara la sucursal pedida contra las filas reales de <code class="pill">usuario_sucursal</code> — nunca contra los claims del JWT solos, para que revocar un acceso surta efecto de inmediato sin esperar a que expire el token.</li>
+        </ol>
+
+        <div class="callout callout--dato">
+          <span class="tag">El alcance como dato, no como código</span>
+          <p>El Art. 3.3 es explícito: el alcance de cada rol DEBE ser un dato del catálogo <code class="pill">rol</code>, nunca una lista de códigos escrita en el propio código de control de acceso — porque un rol nuevo fuera de esa lista escrita a mano no produce ningún error, simplemente queda sin control de alcance aplicado, viendo toda la red sin que nadie lo haya decidido así. El mismo patrón <code class="pill">verificar_alcance_sucursal</code> se reutiliza literalmente, sin reinventarlo, en los módulos 006, 007, 008 y 009.</p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 07 — IA -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="ia">
+        <span class="eyebrow">Capítulo 07</span>
+        <h2>Los cinco modelos de Machine Learning y el asistente conversacional</h2>
+        <p class="dek">Exactamente cinco modelos de scikit-learn, ni uno más ni uno menos — el Art. 5.6 lo fija como número cerrado. Un único LLM externo, admitido con una sola excepción documentada y auditada.</p>
+
+        <h3 class="sub">Cinco modelos, cinco técnicas, elegidas contra lo que los datos realmente sostienen</h3>
+        <table class="role-table">
+          <thead><tr><th>Modelo</th><th>Algoritmo</th><th>Métrica</th><th>Fuente</th><th>Alimenta</th></tr></thead>
+          <tbody>
+            <tr><td>Demanda</td><td>RandomForestRegressor</td><td>MAE</td><td>ClickHouse</td><td>004 – pronóstico</td></tr>
+            <tr><td>Pricing</td><td>RandomForestRegressor</td><td>MAE</td><td>ClickHouse</td><td>003 – precios</td></tr>
+            <tr><td>Churn</td><td>RandomForestClassifier</td><td>F1</td><td><strong>PostgreSQL</strong></td><td>002 – fidelización</td></tr>
+            <tr><td>Anomalías de caja</td><td>IsolationForest</td><td>F1</td><td>ClickHouse</td><td>006 – caja/fraude</td></tr>
+            <tr><td>Segmentación de clientes</td><td>KMeans (k=3) + silhouette</td><td>silhouette</td><td>ClickHouse</td><td>002 – fidelización</td></tr>
+          </tbody>
+        </table>
+        <p>Ningún script decide si su propia versión entrenada queda activa: reporta el resultado a la API de 011, y es <strong>el servidor</strong> quien decide <code class="pill">activo</code> o <code class="pill">descartado_datos_insuficientes</code> comparando el tamaño de muestra contra el mínimo declarado por modelo — la versión mecanizada de la regla de honestidad del Art. 5.9.</p>
+
+        <div class="callout callout--leccion">
+          <span class="tag">Por qué churn entrena contra Postgres y no contra ClickHouse</span>
+          <p>Su etiqueta (<code class="pill">es_riesgo_real</code>: "riesgo real de abandono" vs. "ciclo normal de compra") es una decisión operativa del módulo 002 que nunca se replicó al data warehouse — correctamente, porque es la salida de un proceso de negocio, no un hecho analítico. Sus features de comportamiento toman siempre el segmento del cliente <strong>vigente en la fecha de cada evaluación</strong>, nunca su estado actual — evaluar una decisión pasada contra el presente la distorsionaría.</p>
+        </div>
+
+        <div class="callout callout--dato">
+          <span class="tag">El estado real, sin inflar nada</span>
+          <p>Entrenando contra los datos de semilla del proyecto (sin inflar volumen artificialmente), solo <strong>demanda</strong> alcanzó <code class="pill">activo</code>. Pricing, anomalías de caja y segmentación quedaron <code class="pill">descartado_datos_insuficientes</code>; churn quedó <code class="pill">sin_datos</code>, porque la tabla de evaluaciones arranca vacía en un sistema nuevo. El propio documento del proyecto lo dice sin rodeos: "este es el comportamiento correcto del Art. 5.9 dado el volumen actual de datos, no un bug".</p>
+        </div>
+
+        <h3 class="sub">El asistente conversacional: solo para el Dueño, y nunca inventa un número</h3>
+        <p>El Art. 5.10 lo reserva al rol Dueño/Gerencia General: traduce una pregunta en lenguaje natural a una consulta estructurada real sobre Postgres, ClickHouse o los 5 modelos, y responde <strong>solo</strong> con lo que esa consulta devuelve. El LLM nunca genera SQL libre — sería un riesgo de inyección y de alucinación de columnas inexistentes. En cambio elige, de un catálogo cerrado de <strong>8 herramientas</strong> ya escritas y parametrizadas (merma por sucursal, merma por causa, margen por sucursal, margen por categoría, productos de baja rotación, demanda insatisfecha top, diferencias de cuadre de caja, métricas de modelos ML), cuál invocar y con qué argumentos — el SQL detrás ya fue revisado antes de existir la conversación.</p>
+
+        <div class="callout callout--ojo">
+          <span class="tag">Por qué el proveedor cambió de Anthropic a OpenRouter</span>
+          <p>El Art. 5.10 fijaba originalmente la API de Anthropic. Sin presupuesto para esa API de pago, se enmendó la constitución (v1.3.0 → v1.4.0) para admitir <strong>OpenRouter</strong>, hoy con <code class="pill">nvidia/nemotron-3.5-lightning:free</code> (1M de tokens de contexto). Es, y sigue siendo, la <strong>única dependencia de red externa admitida en todo el stack en producción</strong> — el modelo concreto es un valor de configuración reemplazable sin nueva enmienda; cambiar de proveedor (dejar OpenRouter) sí la exigiría.</p>
+        </div>
+
+        <p>Prueba real, no simulada: pregunta enviada al asistente en producción — <em>"cual sucursal tuvo mas merma este mes"</em> — devolvió <code class="pill">200 OK</code> con la tool correcta invocada y las fechas del mes calculadas bien a partir de la fecha real del sistema; con la tabla de merma vacía en ese momento, el asistente respondió honestamente que no había datos, en vez de inventar una sucursal. Un <code class="pill">UnicodeEncodeError</code> real (un guion largo y una ñ en un header HTTP, invisible en cualquier prueba simulada) se encontró y corrigió solo al probar contra el proveedor real.</p>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 08 — NOTIFICACIONES Y FRONTEND -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="frontend">
+        <span class="eyebrow">Capítulo 08</span>
+        <h2>El canal real de notificaciones y el frontend</h2>
+        <p class="dek">Un correo que de verdad llega a una bandeja real, y seis pantallas construidas sobre un sistema de diseño con su propia identidad — nunca la de un compañero de curso.</p>
+
+        <h3 class="sub">Notificaciones por correo (Art. 8.4)</h3>
+        <p>El artículo exige un canal real con tier gratuito, sin fijar proveedor — Gmail SMTP fue una decisión de implementación, no una enmienda. <code class="pill">enviar_email()</code> nunca lanza excepción: cualquier falla vuelve como <code class="pill">(False, motivo)</code>, y columnas nuevas <code class="pill">notificacion_enviada</code>/<code class="pill">notificacion_detalle</code> registran el resultado real — <code class="pill">false</code> con un motivo real es un estado esperado, nunca un error de integridad. El envío es <em>best-effort</em>, nunca bloqueante: ocurre después de que el cupón ya se confirmó en base de datos.</p>
+
+        <div class="callout callout--ojo">
+          <span class="tag">Un hallazgo real, no un bug</span>
+          <p>La prueba end-to-end contra Gmail real funcionó — el correo de cupón de cumpleaños llegó de verdad, con el código real y la fecha de expiración real. Pero cayó en la carpeta de Spam: comportamiento esperado al enviar correo transaccional desde una cuenta Gmail personal sin dominio propio ni SPF/DKIM alineados. El Art. 8.4 exige un canal real, no que evada filtros de spam — el correo se entregó, existe, es auditable. Las mejoras reales disponibles dentro de esa restricción: asuntos reescritos sin emoji ni signos de exclamación (señal de spam conocida), y una plantilla HTML de marca real en <code class="pill">multipart/alternative</code> con su parte de texto plano como fallback genuino — verificada programáticamente construyendo el <code class="pill">EmailMessage</code> real, no solo revisada a ojo.</p>
+        </div>
+
+        <h3 class="sub">Frontend: seis pantallas, un solo archivo de tokens</h3>
+        <p>React 18 + TypeScript + Vite + Tailwind + Framer Motion, servido como build estático. Las seis pantallas — <code class="pill">Login</code>, <code class="pill">DashboardDueno</code>, <code class="pill">PosCajero</code>, <code class="pill">DashboardSucursal</code>, <code class="pill">Compras</code>, <code class="pill">Administracion</code> — corresponden 1:1 a las seis rutas reales de la aplicación, sin ninguna pantalla a medio construir. <code class="pill">PosCajero</code> replica en el cliente la misma fórmula de IVA y redondeo que el backend, pero el cuadre real de caja siempre lo calcula el servidor.</p>
+
+        <h4 class="subsub">La paleta, con sus valores reales</h4>
+        <table class="role-table">
+          <thead><tr><th>Token</th><th>Valor</th><th>Uso</th></tr></thead>
+          <tbody>
+            <tr><td>Primario</td><td><code>#946F00</code></td><td>Acción principal — 4,63:1 contra blanco</td></tr>
+            <tr><td>Primario texto</td><td><code>#705400</code></td><td>Enlaces y texto de marca — 7,10:1</td></tr>
+            <tr><td>Primario suave</td><td><code>#F8F1DD</code></td><td>Fondos alternos, chips</td></tr>
+            <tr><td>Profundo de marca</td><td><code>#3D2E00</code></td><td>Sidebar, encabezados de tabla</td></tr>
+            <tr><td>Acento</td><td><code>#E64919</code></td><td>Indicadores de UI, nunca texto de cuerpo</td></tr>
+            <tr><td>Éxito / Peligro / Advertencia / Información</td><td><code>#1D794C</code> / <code>#A32E1F</code> / <code>#965E17</code> / <code>#2F6B8C</code></td><td>Estados semánticos, ajustados por auditoría WCAG</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--dato">
+          <span class="tag">El motivo real del rebranding</span>
+          <p>El verde esmeralda original (<code class="pill">#0F6E5C</code>) se parecía demasiado al de otro proyecto del curso — pedido explícito del dueño. El cambio completo a la familia ámbar/dorada de arriba fue una sustitución de <strong>un solo archivo</strong> (<code class="pill">index.css</code>), sin tocar ningún componente — confirmación en la práctica de que la disciplina "solo tokens, nunca color suelto" (Art. 11.2) cumple lo que promete. Se verificó con el toolchain completo (98/98 tests, <code class="pill">tsc</code>/build/lint limpios) y con capturas reales renderizadas por Chromium. El isotipo nuevo —un puestito con toldo a dos aguas, ventanilla de atención y banderín— reemplazó al rayo por defecto de la plantilla de Vite, que nunca se había cambiado.</p>
+        </div>
+
+        <h4 class="subsub">Accesibilidad WCAG 2.1 AA, medida con la fórmula real</h4>
+        <p>Una auditoría dedicada encontró y corrigió cinco hallazgos reales, no cosméticos: el color de advertencia medía <strong>2,82:1</strong> contra su fondo suave — por debajo incluso del mínimo de 3:1 para texto grande, verificado con la fórmula de luminancia relativa del propio estándar, no a ojo; 50 celdas de encabezado de tabla sin <code class="pill">scope="col"</code>; un campo de texto que suprimía el anillo de foco global sin reemplazo equivalente; color de marca hardcodeado en un componente de animación en vez de tokens; y un mensaje de error dinámico sin <code class="pill">role="alert"</code>, que no se anunciaba a lectores de pantalla.</p>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 09 — CALIDAD -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="calidad">
+        <span class="eyebrow">Capítulo 09</span>
+        <h2>Pruebas y hallazgos reales</h2>
+        <p class="dek">El sistema no llegó limpio al primer intento. Llegó limpio porque se auditó cinco veces, cada hallazgo se cerró con código real y se verificó con evidencia — no con la palabra de que "ya funciona".</p>
+
+        <p>La primera auditoría (verificación cruzada de la enmienda de catálogos) no se limitó a revisar los once módulos: contrastó también la propia constitución contra ellos, y encontró <strong>7 fallas reales dentro de la constitución misma</strong> — contradicciones de versión, una meta numérica desactualizada, una referencia cruzada rota, numeración de artículos rota (Capítulo 02). Es una auditoría que se aplicó a sí misma el mismo estándar que le exige al resto del sistema.</p>
+
+        <div class="callout callout--ojo">
+          <span class="tag">La lección más repetida de todo el proyecto</span>
+          <p>La distinción constante entre <strong>"está en el spec.md"</strong> y <strong>"está verificado contra el código real que corre"</strong>. Una auditoría posterior reclasificó dos "confusores resueltos" del pronóstico de demanda — sustitutos y estacionalidad — de "✅ Resuelto" a "✅ Resuelto como dato, ⚠️ parcial en el modelo": la tabla existía y el spec la mencionaba, pero el modelo de machine learning nunca la leía todavía. Tener el dato no es lo mismo que usarlo — y esa misma distinción es la que después encontró que el catálogo de patrones de compra declaraba <code class="pill">es_automatico: true</code> sin que ningún modelo lo detectara de verdad (Capítulo 05, módulo 005).</p>
+        </div>
+
+        <h3 class="sub">Los siete puntos del cierre final, del más barato al más caro</h3>
+        <p>Partiendo de cinco riesgos de segundo orden (validaciones de negocio que el sistema no se hacía cumplir a sí mismo) más dos huecos de cobertura que seguían abiertos, la decisión explícita fue cerrar los siete con código real — <strong>ninguno quedó documentado como "fuera de alcance" teniendo una solución real construible</strong>, ni siquiera los dos más caros:</p>
+        <ol>
+          <li><code class="pill">es_riesgo_real</code> como condición obligatoria antes de una campaña de recuperación (002).</li>
+          <li>Piso de margen al aceptar una recomendación de precio, como advertencia no bloqueante (003).</li>
+          <li>Los cuatro tipos de evento local y el par sustituto ofrecido/aceptado, agregados de verdad como features del modelo de demanda (004).</li>
+          <li>Tabla mínima de layout/anaquel, documentada retroactivamente en el checklist (001).</li>
+          <li>Cuadre de caja horario real, con una tabla nueva de arqueos parciales <em>append-only</em> (006).</li>
+          <li>El motor real de detección de patrón de compra que faltaba (005) — el más señalado de los siete.</li>
+          <li>Trazabilidad de <code class="pill">datafono_id</code> en cada venta con tarjeta (001+007) — el de mayor peso legal.</li>
+        </ol>
+
+        <p>La entrega de los 49 archivos que implementaron estos siete puntos (4 migraciones, 1 servicio nuevo, 18 archivos de backend modificados, 25 documentos de especificación) se verificó con <code class="pill">sha256sum</code> a ambos lados — coincidencia exacta en los 49, no una entrega "probablemente correcta".</p>
+
+        <div class="callout callout--dato">
+          <span class="tag">Lo que queda honestamente sin cerrar</span>
+          <p>Tres puntos de menor prioridad no llegaron a la ronda final de cierre sin una decisión explícita registrada, ni de "se construye" ni de "se descarta formalmente": el umbral de stock mínimo de reorden identificado en la comparación contra el dataset real, la trazabilidad de forma de pago y número de factura del proveedor, y la función de venta en espera/pausada. Documentarlo así — en vez de callarlo o inflar el estado de cierre — es, en sí mismo, una aplicación más del mismo principio de honestidad que rige los modelos de IA del Art. 5.9.</p>
+        </div>
+
+        <p>Otros hallazgos concretos, útiles como ejemplos porque muestran exactamente el tipo de error que una buena auditoría atrapa: un <code class="pill">CHECK</code> que exigía en la misma fila un motivo que en el flujo real de negocio se completa recién en un segundo paso posterior (rechazando la operación válida en el paso 1); un campo <code class="pill">Decimal</code> de la API que llega serializado como <em>string</em> en JSON, sumado con <code class="pill">reduce</code> como si fuera número y dando <code class="pill">$NaN</code> en dos KPIs del dashboard hasta que se detectó comparando el contrato real con <code class="pill">curl</code>; y una ruta de Airflow registrada después de una ruta con parámetro, capturando el literal como si fuera un id — Starlette resuelve rutas en el orden en que se agregan, no por especificidad.</p>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 10 — LECCIÓN DE LA MATERIA -->
+      <!-- ============================================================ -->
+      <section class="chapter" id="leccion">
+        <span class="eyebrow">Capítulo 10</span>
+        <h2>Lo que este proyecto enseña de Construcción de Software</h2>
+        <p class="dek">No como teoría abstracta — como decisiones concretas que se pueden señalar con el dedo, una por una, en este sistema.</p>
+
+        <ul>
+          <li><strong>Especificar antes de construir</strong> es la diferencia entre programar sobre una idea que existe solo en la cabeza de alguien y programar sobre un contrato escrito, verificable y trazable — que once módulos completos, con research y contratos propios, pueden implementar de forma consistente entre sí.</li>
+          <li><strong>Un dato de vocabulario cerrado en texto libre no es un detalle menor</strong>: una sola columna <code class="pill">categoria TEXT</code> escaló a una revisión completa de 11 módulos, 33 catálogos nuevos y un artículo constitucional entero (Art. 13) — el costo de no catalogar a tiempo lo paga, más tarde, cada informe agregado que depende de ese campo.</li>
+          <li><strong>Comparar contra un caso real, no solo contra la propia imaginación</strong>: la comparación contra opensourcepos no fue un ejercicio decorativo — encontró gaps reales (número de documento, stock mínimo) y, con la misma honestidad, confirmó dónde el propio diseño ya superaba al caso real (caducidad, pronóstico antes de comprar, cuadre de caja).</li>
+          <li><strong>Una regla de honestidad se puede programar, no solo prometer</strong>: cada modelo de IA, cada notificación y cada respuesta del asistente conversacional declara su propia incertidumbre o su propio fracaso (<code class="pill">datos_suficientes: false</code>, <code class="pill">notificacion_enviada: false</code> con motivo) en vez de mostrar un resultado bonito sin sustento.</li>
+          <li><strong>El control de acceso vive en capas y como dato, no en un solo lugar ni escrito a mano</strong>: el alcance de un rol es una fila de catálogo, no una lista de códigos en el código — y el mismo patrón de verificación se reutiliza literalmente en cuatro módulos distintos.</li>
+          <li><strong>Un bug que solo aparece contra la dependencia real</strong> (el <code class="pill">UnicodeEncodeError</code> del asistente, la autenticación de ClickHouse contra Docker real) es la razón concreta por la que "pasa en el sandbox" nunca es sinónimo de "funciona".</li>
+          <li><strong>Documentar el porqué, no el qué</strong>: el código de este proyecto está lleno de comentarios que explican qué error real corrigieron y qué hallazgo los motivó — la diferencia entre un comentario decorativo y uno que de verdad ahorra tiempo la próxima vez que alguien lea ese archivo.</li>
+          <li><strong>Un catálogo mintiendo por omisión es tan grave como un dato mal cargado</strong>: <code class="pill">es_automatico: true</code> sin que ningún modelo lo cumpliera de verdad es el mismo tipo de error, a otra escala, que un CHECK huérfano o una FK sin resolver.</li>
+          <li><strong>Cerrar los puntos caros igual que los baratos</strong>: cuando una auditoría entrega siete hallazgos, la disciplina real no es resolver los cinco fáciles y documentar los dos difíciles como "fuera de alcance" — es construir los siete, y decirlo con la misma claridad cuando de verdad queda algo sin cerrar.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- CIERRE -->
+      <!-- ============================================================ -->
+      <section class="chapter closing" id="cierre">
+        <span class="eyebrow">Para cerrar</span>
+        <h2>El resumen en un solo párrafo</h2>
+        <p>El Kiosquito es una cadena propia de minimarkets construida primero en papel —once especificaciones completas, regidas por una constitución de trece artículos que se enmendó seis veces con motivos reales, nunca por capricho— y después en código: un backend FastAPI de API REST pura, con PostgreSQL operando el día a día de cada sucursal, ClickHouse entendiendo un día o un mes por sucursal, y una capa de scikit-learn con exactamente cinco modelos entrenados que prefieren declararse "sin datos suficientes" antes que inventar una cifra. Antes de confiar en esa base de datos, se comparó campo por campo contra un sistema de punto de venta real en producción, y de esa comparación nacieron 33 catálogos maestros que hoy sostienen cada informe compuesto del sistema. Cada uno de sus once módulos —ventas e inventario, clientes, precios, pronóstico, promociones, caja y fraude, pagos y seguridad, compras, expansión, administración y analítica— cubre el ciclo de vida completo de una porción real del negocio, amarrados todos por el mismo modelo de cuatro roles y la misma sesión segura. Y detrás de cada pieza que hoy funciona bien hay, documentado con números reales y sin suavizar lo que quedó pendiente, un hallazgo real que se encontró, se entendió y se corrigió — que es, al final, la parte más honesta de construir software de verdad.</p>
+        <p class="signoff">Este es el proyecto de punta a punta. Todo lo demás son detalles de una sola de estas piezas.</p>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<button class="backtotop" id="backTop" aria-label="Volver arriba">↑</button>
+
+<script>
+(function () {
+  var toggle = document.getElementById('tocToggle');
+  var toc = document.getElementById('tocNav');
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      var open = toc.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    toc.querySelectorAll('a.toc-link').forEach(function (a) {
+      a.addEventListener('click', function () {
+        toc.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a.toc-link'));
+  var sections = links.map(function (a) {
+    return document.querySelector(a.getAttribute('href'));
+  }).filter(Boolean);
+
+  function onScroll() {
+    var y = window.scrollY + 120;
+    var current = sections[0];
+    sections.forEach(function (s) { if (s.offsetTop <= y) current = s; });
+    links.forEach(function (a) { a.classList.remove('active'); });
+    var idx = sections.indexOf(current);
+    if (idx >= 0) links[idx].classList.add('active');
+
+    var backBtn = document.getElementById('backTop');
+    if (backBtn) backBtn.classList.toggle('show', window.scrollY > 600);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var backTop = document.getElementById('backTop');
+  if (backTop) backTop.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>

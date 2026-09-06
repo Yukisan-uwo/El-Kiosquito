@@ -1,0 +1,355 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Administración
+  version: 1.0.0
+  description: Contrato de la API del módulo 010-administracion. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /auth/login:
+    post:
+      summary: Autenticar un usuario y emitir un JWT con claims de rol y sucursal(es) (RF-AD-010)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, example: bearer }
+        '401': { description: 'Credenciales inválidas — registra fila en log_auditoria con exitoso=false' }
+
+  /admin/usuarios:
+    post:
+      summary: Registrar un usuario (OO-AD01)
+      operationId: crearUsuario
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, email, password, rol]
+              properties:
+                nombre: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                rol: { type: string, description: 'código del catálogo rol — RF-AD-011, enmienda v1.1. Ya no es un enum fijo: agregar un rol deja de ser un cambio de contrato y de esquema.' }
+      responses:
+        '201': { description: Usuario creado, content: { application/json: { schema: { $ref: '#/components/schemas/Usuario' } } } }
+
+  /admin/usuarios/{id}:
+    patch:
+      summary: Actualizar un usuario (OO-AD01)
+      operationId: actualizarUsuario
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string }
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Actualizado }
+
+  /admin/usuarios/{id}/rol-sucursales:
+    patch:
+      summary: Asignar rol y sucursal(es) de alcance a un usuario (OO-AD02)
+      operationId: asignarRolYSucursales
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rol]
+              properties:
+                rol: { type: string, description: 'código del catálogo rol — RF-AD-011, enmienda v1.1. Ya no es un enum fijo: agregar un rol deja de ser un cambio de contrato y de esquema.' }
+                sucursal_ids: { type: array, items: { type: integer }, description: 'obligatorio y no vacío si rol es encargado_sucursal o cajero (RN-AD-002); ignorado si rol es dueno o encargado_compras (RN-AD-001)' }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: 'rol con alcance de sucursal sin al menos una sucursal (RN-AD-002)' }
+
+  /admin/usuarios/{id}/desactivar:
+    patch:
+      summary: Dar de baja lógica a un usuario (OO-AD06)
+      operationId: desactivarUsuario
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Usuario desactivado }
+
+  /admin/permisos:
+    get:
+      summary: Consultar la matriz de permisos vigente por rol x recurso x operación (OO-AD03)
+      operationId: consultarMatrizPermisos
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: rol, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PermisoRol' }
+
+  /admin/auditoria:
+    get:
+      summary: Consultar/exportar el log de auditoría filtrado por usuario/fecha/sucursal (OO-AD05)
+      operationId: consultarAuditoria
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: usuario_id, in: query, required: false, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: false, schema: { type: integer } }
+        - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: solo_anomalias, in: query, required: false, schema: { type: boolean }, description: 'si true, filtra exitoso=false (Art. 10.5)' }
+        - { name: formato, in: query, required: false, schema: { type: string, enum: [json, csv] }, description: 'RNF-AD-004' }
+      responses:
+        '200': { description: OK }
+
+  /admin/parametros:
+    post:
+      summary: Registrar un nuevo valor vigente de un parámetro global (OO-AD07)
+      operationId: registrarParametroSistema
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clave, valor]
+              properties:
+                clave: { type: string, example: iva }
+                valor: { type: string, example: '0.15' }
+      responses:
+        '201': { description: Nuevo valor registrado, el anterior queda como histórico }
+
+  /admin/parametros/{clave}:
+    get:
+      summary: Consultar el valor vigente de un parámetro global (OO-AD07)
+      operationId: consultarParametroVigente
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: clave, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clave: { type: string }
+                  valor: { type: string }
+                  vigente_desde: { type: string, format: date-time }
+
+  /admin/arco:
+    post:
+      summary: Registrar una solicitud ARCO de un cliente (Art. 10.3)
+      operationId: crearSolicitudArco
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cliente_id, tipo, detalle]
+              properties:
+                cliente_id: { type: integer }
+                tipo: { type: string, description: 'código del catálogo tipo_solicitud_arco — enmienda v1.1' }
+                detalle: { type: string }
+      responses:
+        '201': { description: Solicitud registrada }
+    get:
+      summary: Listar solicitudes ARCO, filtrable por estado
+      operationId: listarSolicitudesArco
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: estado, in: query, required: false, schema: { type: string }, description: 'código del catálogo estado_solicitud_arco — enmienda v1.1' }
+        - { name: solo_vencidas, in: query, required: false, schema: { type: boolean, default: false }, description: 'RF-AD-013, enmienda v1.1 — solicitudes pendientes cuya fecha_solicitud + tipo_solicitud_arco.plazo_respuesta_dias ya pasó' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SolicitudArco' }
+
+  /admin/arco/{id}/resolver:
+    patch:
+      summary: Registrar la resolución de una solicitud ARCO (Art. 10.3)
+      operationId: resolverSolicitudArco
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado, respuesta]
+              properties:
+                estado: { type: string, description: 'código del catálogo estado_solicitud_arco; debe ser un estado final (es_estado_final = true) — enmienda v1.1' }
+                respuesta: { type: string }
+      responses:
+        '200': { description: Resuelta }
+
+  /catalogos/roles:
+    get:
+      summary: Listar los roles con su nivel jerárquico y alcance (RF-AD-011, RF-AD-014, enmienda v1.1)
+      operationId: listarRoles
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'alcance_cadena traduce el Art. 3.3 a dato: scoping.py lo consulta en vez de comparar contra códigos de rol literales (RN-AD-004)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: encargado_sucursal }
+                    etiqueta: { type: string }
+                    nivel_jerarquico: { type: integer, description: 'único; 1 = Dueño, 4 = Cajero (RN-AD-005)' }
+                    alcance_cadena: { type: boolean, description: 'true = ve toda la red; false = solo sus sucursales asignadas' }
+                    activo: { type: boolean }
+
+  /catalogos/recursos-sistema:
+    get:
+      summary: Listar los recursos protegidos y auditables del sistema (RF-AD-012, RF-AD-014, enmienda v1.1)
+      operationId: listarRecursosSistema
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: modulo, in: query, required: false, schema: { type: string }, description: 'filtra por módulo de specs/ dueño del recurso' }
+      responses:
+        '200':
+          description: 'Mismo vocabulario para la matriz de permisos (OT4.2) y el log de auditoría (OT4.3) — el log no puede registrar un recurso que la matriz no conoce'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: orden_compra }
+                    etiqueta: { type: string }
+                    modulo: { type: string, example: 008-compras-proveedores }
+                    es_auditable: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/operaciones:
+    get:
+      summary: Listar las operaciones de la matriz de permisos (RF-AD-014, enmienda v1.1)
+      operationId: listarOperaciones
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'No incluye eliminar: el Art. 2.4 prohíbe el borrado desde la aplicación, así que el catálogo no ofrece una operación que el sistema nunca debe conceder'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_escritura: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/tipos-solicitud-arco:
+    get:
+      summary: Listar los tipos de derecho ARCO con su plazo legal de respuesta (RF-AD-013, RF-AD-014, enmienda v1.1)
+      operationId: listarTiposSolicitudArco
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: acceso }
+                    etiqueta: { type: string }
+                    plazo_respuesta_dias: { type: integer, description: 'la fecha límite se deriva de fecha_solicitud + este plazo; no se materializa como columna' }
+                    activo: { type: boolean }
+
+  /catalogos/estados-solicitud-arco:
+    get:
+      summary: Listar los estados de solicitud ARCO (RF-AD-014, enmienda v1.1)
+      operationId: listarEstadosSolicitudArco
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Usuario:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        email: { type: string }
+        rol: { type: string }
+        activo: { type: boolean }
+    PermisoRol:
+      type: object
+      properties:
+        rol: { type: string }
+        recurso: { type: string }
+        operacion: { type: string }
+        permitido: { type: boolean }
+    SolicitudArco:
+      type: object
+      properties:
+        id: { type: integer }
+        cliente_id: { type: integer }
+        tipo: { type: string }
+        estado: { type: string }
+        fecha_solicitud: { type: string, format: date-time }

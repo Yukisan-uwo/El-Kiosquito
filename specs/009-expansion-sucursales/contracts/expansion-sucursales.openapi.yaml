@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Expansión y Sucursales
+  version: 1.0.0
+  description: Contrato de la API del módulo 009-expansion-sucursales. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /sucursales:
+    post:
+      summary: Registrar una nueva sucursal, genera el checklist de apertura de 8 ítems (OO-ES01, OO-ES02)
+      operationId: crearSucursal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, direccion]
+              properties:
+                nombre: { type: string }
+                direccion: { type: string }
+      responses:
+        '201': { description: Sucursal creada en estado en_apertura, con checklist inicial, content: { application/json: { schema: { $ref: '#/components/schemas/Sucursal' } } } }
+
+  /sucursales/{id}/checklist/{item}:
+    patch:
+      summary: Marcar un ítem del checklist de apertura como completado (OO-ES02)
+      operationId: completarItemChecklist
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: item, in: path, required: true, schema: { type: string }, description: 'código del catálogo item_checklist_apertura — RF-ES-009, enmienda v1.1. Ya no es un enum fijo: el checklist de apertura es configurable sin migración.' }
+      responses:
+        '200': { description: Ítem marcado como completado }
+
+  /sucursales/{id}/heredar-catalogo:
+    post:
+      summary: Ejecutar la herencia de catálogo y precios base de la cadena hacia esta sucursal (RF-ES-004). Orquesta llamadas a POST /precios de 003-precios-margenes (Decisión 3 de research.md) — no crea filas de precio directamente.
+      operationId: heredarCatalogo
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '201':
+          description: Herencia ejecutada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HerenciaCatalogoSucursal' }
+        '409': { description: 'Esta sucursal ya ejecutó la herencia previamente (RN-ES-002)' }
+
+  /sucursales/{id}/personal:
+    post:
+      summary: Asignar personal a la sucursal en apertura, delegando en PATCH /admin/usuarios/{id}/rol-sucursales de 010-administracion (OO-ES04, Decisión 2 de research.md)
+      operationId: asignarPersonalSucursal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuario_id]
+              properties:
+                usuario_id: { type: integer }
+                es_responsable: { type: boolean, default: false, description: 'si true, además fija sucursal.responsable_id con este usuario' }
+      responses:
+        '200': { description: 'Personal asignado (delegado a 010-administracion)' }
+
+  /sucursales/{id}/activar:
+    post:
+      summary: Activar la sucursal como operativa, exige los 8 ítems del checklist completados (OO-ES05, RN-ES-001)
+      operationId: activarSucursal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Sucursal activada como operativa }
+        '422':
+          description: 'Checklist incompleto (RN-ES-001)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items_pendientes: { type: array, items: { type: string } }
+
+  /sucursales/{id}/estado-apertura:
+    get:
+      summary: Consultar el estado de apertura de una sucursal en proceso (OO-ES06)
+      operationId: consultarEstadoApertura
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sucursal: { $ref: '#/components/schemas/Sucursal' }
+                  checklist: { type: array, items: { $ref: '#/components/schemas/ChecklistItem' } }
+
+  /sucursales/{id}/cerrar:
+    patch:
+      summary: Dar de baja o cerrar temporalmente una sucursal operativa (OO-ES07)
+      operationId: cerrarSucursal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Sucursal cerrada }
+
+  /catalogos/items-checklist-apertura:
+    get:
+      summary: Listar los ítems del checklist de apertura, en orden y marcando cuáles son bloqueantes (RF-ES-009, RF-ES-011, enmienda v1.1)
+      operationId: listarItemsChecklistApertura
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: solo_activos, in: query, required: false, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: 'El checklist de apertura pasa a ser dato configurable: agregar o quitar un paso del proceso ya no es una migración de esquema'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: permiso_municipal }
+                    etiqueta: { type: string }
+                    orden: { type: integer, description: 'orden real de ejecución en la apertura' }
+                    es_bloqueante: { type: boolean, description: 'sin permiso municipal ni inspección de seguridad no se puede activar; sin mobiliario sí se puede avanzar (RN-ES-004)' }
+                    activo: { type: boolean }
+
+  /catalogos/estados-sucursal:
+    get:
+      summary: Listar los estados de sucursal y cuál opera ventas (RF-ES-011, enmienda v1.1)
+      operationId: listarEstadosSucursal
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: '001-core-ventas-inventario y 011-analitica-reportes consultan opera_ventas en vez de comparar contra el literal operativa'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    opera_ventas: { type: boolean }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Sucursal:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        direccion: { type: string }
+        responsable_id: { type: integer, nullable: true }
+        estado: { type: string }
+        fecha_registro: { type: string, format: date-time }
+        fecha_activacion: { type: string, format: date-time, nullable: true }
+    ChecklistItem:
+      type: object
+      properties:
+        item: { type: string }
+        completado: { type: boolean }
+        fecha_completado: { type: string, format: date-time, nullable: true }
+    HerenciaCatalogoSucursal:
+      type: object
+      properties:
+        sucursal_id: { type: integer }
+        cantidad_productos_heredados: { type: integer }
+        cantidad_productos_pendientes: { type: integer }
+        fecha: { type: string, format: date-time }

@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito - Promociones Inteligentes
+  description: >
+    Contrato del módulo 005-promociones-inteligentes. Dueño de `cupon` y de
+    todo su ciclo de vida (envío, canje, expiración). Desde la enmienda v1.2
+    también es dueño de `sugerencia_patron_compra`, el motor real que
+    calcula (nunca decide a mano) cuándo un patrón de compra amerita
+    sugerir un cupón — ver spec.md, RN-PI-005.
+  version: "1.2.0"
+servers:
+  - url: /api/v1
+
+paths:
+  /promociones/cupones:
+    post:
+      summary: Registrar el envío de un cupón (RF-PI-001)
+      security:
+        - bearerAuth: [fidelizacion, sistema, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuponCrear'
+      responses:
+        '201':
+          description: Cupón registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupon'
+        '422':
+          description: Datos inválidos, incluye cupón recuperacion_churn sin evaluacion_churn_id (RN-PI-002)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /promociones/cupones/{id}/canjear:
+    patch:
+      summary: Registrar el canje de un cupón en una venta (RF-PI-002, RN-PI-001)
+      security:
+        - bearerAuth: [cajero, encargado_sucursal, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [venta_id]
+              properties:
+                venta_id:
+                  type: integer
+                  format: int64
+      responses:
+        '200':
+          description: Cupón canjeado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupon'
+        '422':
+          description: Cupón ya canjeado o vencido (RN-PI-001)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /clientes/{cliente_id}/cupones:
+    get:
+      summary: Consultar cupones activos e históricos de un cliente (RF-PI-003)
+      security:
+        - bearerAuth: [fidelizacion, encargado_sucursal, gerencia]
+      parameters:
+        - name: cliente_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de cupones del cliente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cupon'
+
+  /promociones/sugerencias-patron/recalcular:
+    post:
+      summary: >-
+        Recalcular las sugerencias de patrón de compra: calcula reglas de
+        asociación (soporte/confianza/lift) sobre `detalle_venta`/`venta` y
+        persiste una sugerencia por cada cliente que califica y aún no fue
+        sugerido (RN-PI-005, enmienda v1.2). Dueño-exclusivo, mismo
+        criterio que `crear cupon`.
+      security:
+        - bearerAuth: [dueno]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SugerenciaPatronRecalcularIn'
+      responses:
+        '200':
+          description: Resumen del recálculo — no expone las sugerencias en sí, ver GET
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaPatronRecalcularOut'
+
+  /promociones/sugerencias-patron:
+    get:
+      summary: Listar sugerencias de patrón de compra, filtrables por cliente y estado (enmienda v1.2)
+      security:
+        - bearerAuth: [dueno, encargado_sucursal, encargado_compras, cajero]
+      parameters:
+        - name: cliente_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: estado
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sugerencias ordenadas por generado_en descendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SugerenciaPatronCompra'
+
+  /promociones/sugerencias-patron/{id}/resolver:
+    patch:
+      summary: >-
+        Aceptar (creando un cupón real de tipo_origen=patron_compra) o
+        descartar una sugerencia (RN-PI-005, enmienda v1.2). El motor decide
+        QUÉ producto sugerir, nunca de cuánto es el descuento — aceptar sin
+        aportarlo se rechaza con 422.
+      security:
+        - bearerAuth: [dueno]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SugerenciaPatronResolverIn'
+      responses:
+        '200':
+          description: Sugerencia resuelta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaPatronCompra'
+        '409':
+          description: La sugerencia ya fue resuelta antes (estado final)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 'aceptar=true sin descuento_tipo/descuento_valor/fecha_expiracion (RN-PI-005)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /catalogos/estados-sugerencia-patron:
+    get:
+      summary: Listar los estados de sugerencia de patrón de compra (enmienda v1.2)
+      operationId: listarEstadosSugerenciaPatron
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/tipos-origen-cupon:
+    get:
+      summary: Listar los orígenes de cupón, indicando cuáles los dispara el sistema (RF-PI-007, enmienda v1.1)
+      operationId: listarTiposOrigenCupon
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: '011-analitica-reportes usa es_automatico para calcular el indicador de OT2.3: solo los cupones automáticos los segmenta el modelo, así que mezclarlos con los manuales daría un porcentaje sin sentido'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_automatico: { type: boolean }
+                    requiere_evaluacion_churn: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/tipos-descuento:
+    get:
+      summary: Listar los tipos de descuento con su tope de valor permitido (RF-PI-007, enmienda v1.1)
+      operationId: listarTiposDescuento
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: porcentaje }
+                    etiqueta: { type: string }
+                    valor_maximo_permitido: { type: number, description: '100 para porcentaje; un monto razonable para monto_fijo (RN-PI-004)' }
+                    activo: { type: boolean }
+
+  /catalogos/estados-cupon:
+    get:
+      summary: Listar los estados de cupón y cuál permite canje (RF-PI-007, enmienda v1.1)
+      operationId: listarEstadosCupon
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    permite_canje: { type: boolean, description: 'saca del código la condición de canje de RF-PI-002' }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CuponCrear:
+      type: object
+      required: [cliente_id, tipo_origen, descuento_tipo, descuento_valor, fecha_expiracion]
+      properties:
+        cliente_id:
+          type: integer
+          format: int64
+        tipo_origen:
+          type: string
+          description: 'código del catálogo tipo_origen_cupon — RF-PI-005, enmienda v1.1. Ya no es un enum fijo del contrato.'
+        evaluacion_churn_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Obligatorio si tipo_origen=recuperacion_churn (RN-PI-002)
+        descuento_tipo:
+          type: string
+          description: 'código del catálogo tipo_descuento — RF-PI-005, enmienda v1.1'
+        descuento_valor:
+          type: number
+          minimum: 0
+          description: 'no puede superar tipo_descuento.valor_maximo_permitido (RN-PI-004, enmienda v1.1) — el mínimo de 0 por sí solo permitía un 200% de descuento'
+        fecha_expiracion:
+          type: string
+          format: date-time
+    Cupon:
+      allOf:
+        - $ref: '#/components/schemas/CuponCrear'
+        - type: object
+          required: [id, codigo, fecha_envio, estado]
+          properties:
+            id:
+              type: integer
+              format: int64
+            codigo:
+              type: string
+            fecha_envio:
+              type: string
+              format: date-time
+            estado:
+              type: string
+              description: 'código del catálogo estado_cupon — enmienda v1.1'
+            venta_id_canje:
+              type: integer
+              format: int64
+              nullable: true
+            fecha_canje:
+              type: string
+              format: date-time
+              nullable: true
+    SugerenciaPatronRecalcularIn:
+      type: object
+      properties:
+        periodo_dias:
+          type: integer
+          default: 90
+          minimum: 1
+          maximum: 365
+        soporte_minimo:
+          type: number
+          default: 0.01
+        confianza_minima:
+          type: number
+          default: 0.30
+        lift_minimo:
+          type: number
+          default: 1.10
+        veces_minimas_base:
+          type: integer
+          default: 2
+        limite_por_cliente:
+          type: integer
+          default: 3
+          maximum: 20
+    SugerenciaPatronRecalcularOut:
+      type: object
+      required: [periodo_dias, reglas_evaluadas, sugerencias_generadas, sugerencias_omitidas_duplicadas]
+      properties:
+        periodo_dias:
+          type: integer
+        reglas_evaluadas:
+          type: integer
+        sugerencias_generadas:
+          type: integer
+        sugerencias_omitidas_duplicadas:
+          type: integer
+          description: 'sugerencias que ya existían pendientes para el mismo par cliente/producto_sugerido — no es un error'
+    SugerenciaPatronCompra:
+      type: object
+      required:
+        - id
+        - cliente_id
+        - producto_base_id
+        - producto_sugerido_id
+        - veces_comprado_base
+        - soporte
+        - confianza
+        - lift
+        - periodo_dias
+        - estado
+        - generado_en
+      properties:
+        id:
+          type: integer
+          format: int64
+        cliente_id:
+          type: integer
+          format: int64
+        producto_base_id:
+          type: integer
+          format: int64
+        producto_sugerido_id:
+          type: integer
+          format: int64
+        veces_comprado_base:
+          type: integer
+        soporte:
+          type: number
+        confianza:
+          type: number
+        lift:
+          type: number
+        periodo_dias:
+          type: integer
+        estado:
+          type: string
+          description: 'código del catálogo estado_sugerencia_patron'
+        generado_en:
+          type: string
+          format: date-time
+        atendida_en:
+          type: string
+          format: date-time
+          nullable: true
+        atendida_por:
+          type: integer
+          format: int64
+          nullable: true
+        cupon_id:
+          type: integer
+          format: int64
+          nullable: true
+    SugerenciaPatronResolverIn:
+      type: object
+      required: [aceptar]
+      properties:
+        aceptar:
+          type: boolean
+        descuento_tipo:
+          type: string
+          nullable: true
+          description: obligatorio si aceptar=true (RN-PI-005)
+        descuento_valor:
+          type: number
+          minimum: 0
+          nullable: true
+          description: obligatorio si aceptar=true (RN-PI-005)
+        fecha_expiracion:
+          type: string
+          format: date-time
+          nullable: true
+          description: obligatorio si aceptar=true (RN-PI-005)
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

@@ -1,0 +1,311 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito - Pagos y Seguridad
+  description: >
+    Contrato del módulo 007-pagos-seguridad. Dueño del catálogo de datáfonos
+    por sucursal y de su historial append-only de revisiones de seguridad.
+    Desde la enmienda v1.2 también expone la trazabilidad venta↔datáfono
+    (lectura cruzada de solo lectura hacia `venta`, 001-core-ventas-inventario).
+  version: "1.2.0"
+servers:
+  - url: /api/v1
+
+paths:
+  /datafonos:
+    post:
+      summary: Registrar un datáfono nuevo (RF-PS-001)
+      security:
+        - bearerAuth: [prevencion_perdidas, encargado_sucursal, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, codigo_serie]
+              properties:
+                sucursal_id:
+                  type: integer
+                  format: int64
+                codigo_serie:
+                  type: string
+      responses:
+        '201':
+          description: Datáfono registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datafono'
+        '422':
+          description: codigo_serie ya existe (RNF-PS-002)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /datafonos/{id}/baja:
+    patch:
+      summary: Dar de baja un datáfono, conservando su historial (RF-PS-002)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Datáfono dado de baja
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datafono'
+
+  /datafonos/{id}/revisiones:
+    post:
+      summary: Registrar la revisión de seguridad de un datáfono (RF-PS-003)
+      security:
+        - bearerAuth: [prevencion_perdidas]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado:
+                  type: string
+                  description: 'código del catálogo estado_revision — RF-PS-007, enmienda v1.1. Ya no es un enum fijo del contrato.'
+                observaciones:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Revisión registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionDatafono'
+
+  /datafonos/{id}/estado:
+    get:
+      summary: Consultar el estado vigente de un datáfono (RF-PS-004, RF-PS-005, RN-PS-001)
+      security:
+        - bearerAuth: [prevencion_perdidas, encargado_sucursal, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Estado vigente, o declaración explícita de que no hay revisión registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoDatafono'
+
+  /datafonos/{id}/ventas:
+    get:
+      summary: >-
+        Trazabilidad venta↔datáfono (RN-PS-004, enmienda v1.2): lista las
+        ventas cobradas con este datáfono, cada una con el estado de
+        revisión vigente EN LA FECHA DE ESA VENTA — nunca el estado actual
+        del datáfono. Lectura cruzada de solo lectura hacia `venta`
+        (001-core-ventas-inventario, `venta.datafono_id`, enmienda v1.5).
+      security:
+        - bearerAuth: [prevencion_perdidas, encargado_sucursal, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Ventas cobradas por este datáfono, ordenadas por fecha_hora descendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VentaConEstadoRevision'
+        '404':
+          description: Datáfono no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sucursales/{sucursal_id}/datafonos:
+    get:
+      summary: Listar los datáfonos de una sucursal con su estado vigente (RF-PS-006)
+      security:
+        - bearerAuth: [prevencion_perdidas, encargado_sucursal, gerencia]
+      parameters:
+        - name: sucursal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de datáfonos con su estado vigente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EstadoDatafono'
+
+  /sucursales/{sucursal_id}/datafonos/conformidad:
+    get:
+      summary: Indicador de conformidad de terminales de una sucursal (RF-PS-008, enmienda v1.1) — el KPI de OT4.4
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: sucursal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 'El numerador se calcula con estado_revision.cuenta_como_conforme, no con una lista de códigos escrita en la consulta (RN-PS-002)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  terminales_totales: { type: integer }
+                  terminales_conformes: { type: integer }
+                  terminales_sin_revision:
+                    type: integer
+                    description: 'nunca se cuentan como conformes (RN-PS-001) — un datáfono sin revisar no es un datáfono en regla'
+                  porcentaje_conformes: { type: number }
+
+  /catalogos/estados-revision:
+    get:
+      summary: Listar los estados de revisión y cuáles cuentan como conformes (RF-PS-007, enmienda v1.1)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: actualizado }
+                    etiqueta: { type: string }
+                    cuenta_como_conforme:
+                      type: boolean
+                      description: 'define el numerador del KPI de OT4.4; agregar un estado intermedio en el futuro no obliga a revisar cada consulta'
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Datafono:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sucursal_id:
+          type: integer
+          format: int64
+        codigo_serie:
+          type: string
+        activo:
+          type: boolean
+    RevisionDatafono:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        datafono_id:
+          type: integer
+          format: int64
+        estado:
+          type: string
+          description: 'código del catálogo estado_revision — RF-PS-007, enmienda v1.1. Ya no es un enum fijo del contrato.'
+        observaciones:
+          type: string
+          nullable: true
+        fecha_revision:
+          type: string
+          format: date-time
+        revisado_por:
+          type: integer
+          format: int64
+    EstadoDatafono:
+      type: object
+      required: [datafono_id, sin_revision]
+      properties:
+        datafono_id:
+          type: integer
+          format: int64
+        codigo_serie:
+          type: string
+        sin_revision:
+          type: boolean
+          description: true si nunca se registró ninguna revisión (RN-PS-001)
+        estado_vigente:
+          type: string
+          description: 'código del catálogo estado_revision — RF-PS-007, enmienda v1.1. Ya no es un enum fijo del contrato.'
+          nullable: true
+        fecha_ultima_revision:
+          type: string
+          format: date-time
+          nullable: true
+    VentaConEstadoRevision:
+      type: object
+      required: [venta_id, numero_documento, fecha_hora, total, sin_revision_al_momento]
+      properties:
+        venta_id:
+          type: integer
+          format: int64
+        numero_documento:
+          type: string
+        fecha_hora:
+          type: string
+          format: date-time
+        total:
+          type: number
+        sin_revision_al_momento:
+          type: boolean
+          description: 'true si el datáfono aún no tenía ninguna revisión registrada en la fecha de esta venta (RN-PS-001/RN-PS-004)'
+        estado_revision_al_momento:
+          type: string
+          nullable: true
+          description: 'código del catálogo estado_revision vigente EN LA FECHA DE LA VENTA — nunca el estado actual del datáfono (RN-PS-004, enmienda v1.2)'
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

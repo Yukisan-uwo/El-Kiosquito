@@ -1,0 +1,481 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito - Clientes y Fidelización
+  description: >
+    Contrato del módulo 002-clientes-fidelizacion. Dueño de `cliente` y del
+    historial append-only de segmentación de valor y riesgo de abandono.
+    No expone el mecanismo de cupones (ver 005-promociones-inteligentes).
+  version: "1.0.0"
+servers:
+  - url: /api/v1
+
+paths:
+  /clientes:
+    post:
+      summary: Registrar cliente (RF-CF-001)
+      security:
+        - bearerAuth: [fidelizacion, encargado_sucursal, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteCrear'
+      responses:
+        '201':
+          description: Cliente registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '422':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /clientes/{id}/historial-compras:
+    get:
+      summary: Historial de compras del cliente, solo lectura sobre 001-core-ventas-inventario (RF-CF-002)
+      security:
+        - bearerAuth: [fidelizacion, encargado_sucursal, gerencia]
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: Lista de ventas del cliente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VentaResumen'
+        '404':
+          description: Cliente no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /clientes/{id}/segmento:
+    get:
+      summary: Segmento de valor más reciente del cliente (RF-CF-003, RF-CF-007)
+      security:
+        - bearerAuth: [fidelizacion, gerencia]
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: Segmento más reciente, o declaración explícita de datos insuficientes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SegmentoConsulta'
+        '404':
+          description: Cliente no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fidelizacion/segmentos:
+    post:
+      summary: Registrar un ciclo de segmentación calculado por el modelo K-Means (RF-CF-003)
+      security:
+        - bearerAuth: [sistema]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegmentoCrear'
+      responses:
+        '201':
+          description: Ciclo de segmentación registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Segmento'
+        '422':
+          description: Falta tamaño de muestra, periodo (Art. 5.9) o version_modelo_id (RF-CF-009, enmienda v1.1)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'segmento_codigo no existe en el catálogo, o version_modelo_id no existe en 011-analitica-reportes (enmienda v1.1)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /clientes/{id}/segmento/historial:
+    get:
+      summary: Historial completo de segmentos por los que pasó el cliente, con su rango de vigencia (RF-CF-010, enmienda v1.1)
+      security:
+        - bearerAuth: [fidelizacion, gerencia]
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: 'Asignaciones ordenadas de la más antigua a la más reciente. La última tiene vigente_hasta = null.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Segmento'
+        '404':
+          description: Cliente no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /catalogos/segmentos:
+    get:
+      summary: Listar el catálogo de segmentos de valor con su prioridad comercial (RF-CF-011, enmienda v1.1)
+      security:
+        - bearerAuth: [fidelizacion, gerencia, sistema]
+      parameters:
+        - name: solo_activos
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SegmentoCatalogo'
+
+  /clientes/{id}/riesgo-abandono:
+    get:
+      summary: Evaluación de riesgo de abandono más reciente (RF-CF-004, RF-CF-007)
+      security:
+        - bearerAuth: [fidelizacion, gerencia]
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: Evaluación más reciente, o declaración explícita de datos insuficientes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluacionChurnConsulta'
+        '404':
+          description: Cliente no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fidelizacion/evaluaciones-churn:
+    post:
+      summary: Registrar una evaluación de riesgo de abandono calculada por el modelo de churn (RF-CF-004)
+      security:
+        - bearerAuth: [sistema]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluacionChurnCrear'
+      responses:
+        '201':
+          description: Evaluación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluacionChurn'
+        '422':
+          description: Falta justificación o tamaño de muestra (Art. 5.9)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fidelizacion/campanas-recuperacion:
+    post:
+      summary: Registrar el envío de una campaña de recuperación (RF-CF-005, RN-CF-001)
+      security:
+        - bearerAuth: [fidelizacion, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampanaRecuperacionCrear'
+      responses:
+        '201':
+          description: Campaña registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampanaRecuperacion'
+        '409':
+          description: El cliente ya volvió a comprar desde su última evaluación de riesgo (RN-CF-001)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fidelizacion/campanas-recuperacion/{id}/resultado:
+    get:
+      summary: Consultar si el cliente recuperó actividad tras la campaña (RF-CF-006)
+      security:
+        - bearerAuth: [fidelizacion, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Resultado de la campaña
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampanaResultado'
+        '404':
+          description: Campaña no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ClienteId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  schemas:
+    ClienteCrear:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+        contacto:
+          type: string
+          nullable: true
+        fecha_nacimiento:
+          type: string
+          format: date
+          nullable: true
+    Cliente:
+      allOf:
+        - $ref: '#/components/schemas/ClienteCrear'
+        - type: object
+          required: [id, creado_en]
+          properties:
+            id:
+              type: integer
+              format: int64
+            creado_en:
+              type: string
+              format: date-time
+    VentaResumen:
+      type: object
+      description: Proyección de solo lectura de `venta`, propiedad de 001-core-ventas-inventario
+      properties:
+        id:
+          type: integer
+          format: int64
+        fecha_hora:
+          type: string
+          format: date-time
+        total:
+          type: number
+          format: float
+    SegmentoCrear:
+      type: object
+      required: [cliente_id, segmento_codigo, version_modelo_id, tamano_muestra, periodo_inicio, periodo_fin]
+      properties:
+        cliente_id:
+          type: integer
+          format: int64
+        segmento_codigo:
+          type: string
+          description: 'FK al catálogo segmento — RF-CF-008, enmienda v1.1. Antes era texto libre.'
+        version_modelo_id:
+          type: integer
+          format: int64
+          description: 'versión del modelo de segmentación que produjo esta asignación (RF-CF-009, enmienda v1.1) — permite distinguir una reclasificación masiva del modelo de un cambio real del cliente'
+        frecuencia_snapshot:
+          type: number
+          nullable: true
+        margen_snapshot:
+          type: number
+          nullable: true
+        recencia_dias_snapshot:
+          type: integer
+          nullable: true
+        tamano_muestra:
+          type: integer
+          minimum: 1
+        periodo_inicio:
+          type: string
+          format: date
+        periodo_fin:
+          type: string
+          format: date
+    Segmento:
+      description: 'Una asignación de segmento a un cliente (una fila de segmento_cliente). No confundir con SegmentoCatalogo, que es el catálogo de segmentos posibles.'
+      allOf:
+        - $ref: '#/components/schemas/SegmentoCrear'
+        - type: object
+          required: [id, fecha_calculo]
+          properties:
+            id:
+              type: integer
+              format: int64
+            fecha_calculo:
+              type: string
+              format: date-time
+              description: 'inicio de vigencia de esta asignación (enmienda v1.1)'
+            vigente_hasta:
+              type: string
+              format: date-time
+              nullable: true
+              description: 'null = asignación vigente. Con fecha_calculo forma el rango de la dimensión SCD tipo 2 (enmienda v1.1)'
+    SegmentoCatalogo:
+      type: object
+      description: 'Catálogo de segmentos de valor (enmienda v1.1). Los códigos son los nombres de negocio de los clusters, no los números que devuelve el algoritmo.'
+      properties:
+        codigo:
+          type: string
+          example: leal_alto_margen
+        etiqueta:
+          type: string
+          example: Leal de alto margen
+        descripcion:
+          type: string
+        prioridad_comercial:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: '005-promociones-inteligentes lo usa para decidir a qué segmento atender primero cuando el presupuesto de cupones es limitado (OT2.3)'
+        activo:
+          type: boolean
+    SegmentoConsulta:
+      type: object
+      required: [datos_suficientes]
+      properties:
+        datos_suficientes:
+          type: boolean
+        segmento:
+          $ref: '#/components/schemas/Segmento'
+          nullable: true
+    EvaluacionChurnCrear:
+      type: object
+      required: [cliente_id, es_riesgo_real, dias_sin_compra_al_momento, justificacion, tamano_muestra]
+      properties:
+        cliente_id:
+          type: integer
+          format: int64
+        es_riesgo_real:
+          type: boolean
+        dias_sin_compra_al_momento:
+          type: integer
+          minimum: 0
+        frecuencia_historica_dias:
+          type: number
+          nullable: true
+        justificacion:
+          type: string
+          minLength: 10
+        tamano_muestra:
+          type: integer
+          minimum: 1
+    EvaluacionChurn:
+      allOf:
+        - $ref: '#/components/schemas/EvaluacionChurnCrear'
+        - type: object
+          required: [id, fecha_evaluacion]
+          properties:
+            id:
+              type: integer
+              format: int64
+            fecha_evaluacion:
+              type: string
+              format: date-time
+    EvaluacionChurnConsulta:
+      type: object
+      required: [datos_suficientes]
+      properties:
+        datos_suficientes:
+          type: boolean
+        evaluacion:
+          $ref: '#/components/schemas/EvaluacionChurn'
+          nullable: true
+    CampanaRecuperacionCrear:
+      type: object
+      required: [cliente_id, evaluacion_churn_id]
+      properties:
+        cliente_id:
+          type: integer
+          format: int64
+        evaluacion_churn_id:
+          type: integer
+          format: int64
+        cupon_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: FK externa opcional hacia 005-promociones-inteligentes
+    CampanaRecuperacion:
+      allOf:
+        - $ref: '#/components/schemas/CampanaRecuperacionCrear'
+        - type: object
+          required: [id, fecha_envio, usuario_id]
+          properties:
+            id:
+              type: integer
+              format: int64
+            fecha_envio:
+              type: string
+              format: date-time
+            usuario_id:
+              type: integer
+              format: int64
+    CampanaResultado:
+      type: object
+      required: [campana_id, recupero_actividad]
+      properties:
+        campana_id:
+          type: integer
+          format: int64
+        recupero_actividad:
+          type: boolean
+        fecha_compra_posterior:
+          type: string
+          format: date-time
+          nullable: true
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

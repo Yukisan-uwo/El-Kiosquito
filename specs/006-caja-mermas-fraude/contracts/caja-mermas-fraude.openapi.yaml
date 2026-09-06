@@ -1,0 +1,720 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito - Caja, Mermas y Fraude
+  description: >
+    Contrato del módulo 006-caja-mermas-fraude. Dueño de `turno_caja`,
+    `alerta_fraude_pago`, `merma`, `incidencia_cuadre_caja`, (enmienda v1.1)
+    `punto_control_horario_turno` y (enmienda v1.3) `arqueo_parcial_turno`.
+    Único módulo del proyecto que recibe una escritura cruzada (ver
+    research.md, Decisión 3).
+  version: "1.3.0"
+servers:
+  - url: /api/v1
+
+paths:
+  /caja/turnos:
+    post:
+      summary: Abrir un turno de caja (RF-CMF-001)
+      security:
+        - bearerAuth: [cajero, encargado_sucursal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, monto_inicial]
+              properties:
+                sucursal_id:
+                  type: integer
+                  format: int64
+                monto_inicial:
+                  type: number
+                  minimum: 0
+      responses:
+        '201':
+          description: Turno abierto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnoCaja'
+        '409':
+          description: El cajero ya tiene un turno abierto (RN-CMF-001)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /caja/turnos/{id}/cerrar:
+    patch:
+      summary: Cerrar un turno de caja, calculando la diferencia (RF-CMF-002, RF-CMF-003, RF-CMF-004)
+      security:
+        - bearerAuth: [cajero, encargado_sucursal]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [monto_contado]
+              properties:
+                monto_contado:
+                  type: number
+                  minimum: 0
+                motivo_diferencia:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Turno cerrado con diferencia calculada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnoCaja'
+        '422':
+          description: Falta monto_contado, o diferencia != 0 sin motivo_diferencia (RN-CMF-002)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mermas:
+    post:
+      summary: Registrar una merma detectada, sin exigir causa (RF-CMF-005)
+      security:
+        - bearerAuth: [prevencion_perdidas, encargado_sucursal, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MermaCrear'
+      responses:
+        '201':
+          description: Merma registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merma'
+        '422':
+          description: Cantidad o valor estimado en cero
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Consultar mermas por sucursal/periodo/causa (RF-CMF-007)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: sucursal_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: desde
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: hasta
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: causa
+          in: query
+          schema:
+            type: string
+        - name: atribuible_a_persona
+          in: query
+          description: 'RF-CMF-016, enmienda v1.2 — filtra por causa_merma.es_atribuible_a_persona sin que el consumidor tenga que enumerar códigos de causa (RN-CMF-007). true = error humano o fraude interno; false = robo externo o caducidad.'
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lista de mermas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Merma'
+
+  /mermas/{id}/causa:
+    patch:
+      summary: Asignar la causa de una merma ya registrada (RF-CMF-006)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [causa]
+              properties:
+                causa:
+                  type: string
+                  description: 'código del catálogo causa_merma — RF-CMF-014, enmienda v1.2. Ya no es un enum fijo del contrato.'
+      responses:
+        '200':
+          description: Causa asignada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merma'
+
+  /mermas/{id}/resultado:
+    patch:
+      summary: Registrar el resultado de investigación de una merma (RF-CMF-008, RN-CMF-003)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resultado_investigacion]
+              properties:
+                resultado_investigacion:
+                  type: string
+                  description: 'código del catálogo resultado_investigacion — enmienda v1.2'
+      responses:
+        '200':
+          description: Resultado registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merma'
+        '422':
+          description: La merma no tiene causa asignada todavía (RN-CMF-003)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /caja/incidencias-cuadre:
+    post:
+      summary: Registrar una incidencia de cuadre detectada por el modelo de anomalías (RF-CMF-009, Sistema)
+      security:
+        - bearerAuth: [sistema]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [turno_caja_id, score_anomalia, justificacion]
+              properties:
+                turno_caja_id:
+                  type: integer
+                  format: int64
+                score_anomalia:
+                  type: number
+                justificacion:
+                  type: string
+                  minLength: 10
+      responses:
+        '201':
+          description: Incidencia registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidenciaCuadreCaja'
+        '409':
+          description: Ya existe una incidencia pendiente para este turno (RN-CMF-005)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /caja/alertas-fraude:
+    post:
+      summary: Registrar una alerta de fraude en pago (RF-CMF-010, llamado desde 001-core-ventas-inventario)
+      security:
+        - bearerAuth: [sistema_interno]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertaFraudeCrear'
+      responses:
+        '201':
+          description: Alerta registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaFraude'
+
+  /caja/alertas-fraude/{id}/atender:
+    patch:
+      summary: Atender (resolver) una alerta de fraude en pago (RF-CMF-011, RN-CMF-004)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Alerta atendida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaFraude'
+        '422':
+          description: La alerta ya estaba atendida (RN-CMF-004)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /caja/turnos/{turno_id}/checkpoints:
+    post:
+      summary: >-
+        Generar un punto de control horario del monto esperado acumulado de un turno
+        abierto (RF-CMF-012, enmienda v1.1). Endpoint interno, invocado exclusivamente
+        por el scheduler del sistema — nunca accesible desde el frontend de un cajero
+        o encargado.
+      security:
+        - bearerAuth: [sistema]
+      parameters:
+        - name: turno_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '201':
+          description: Punto de control generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PuntoControlHorarioTurno'
+        '409':
+          description: El turno ya no está abierto (no se generan checkpoints de turnos cerrados)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Consultar el historial de puntos de control de un turno (RF-CMF-013, enmienda v1.1)
+      security:
+        - bearerAuth: [encargado_sucursal, gerencia, sistema]
+      parameters:
+        - name: turno_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Puntos de control ordenados por hora_checkpoint ascendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PuntoControlHorarioTurno'
+
+  /caja/turnos/{turno_id}/arqueos-parciales:
+    post:
+      summary: >-
+        Registrar un arqueo parcial real de un turno abierto: conteo físico
+        de la caja a mitad de turno, hecho por el propio cajero o como
+        spot-check de supervisión por el encargado de sucursal (RN-CMF-009,
+        enmienda v1.3). Complementa a `/checkpoints` (calculado, automático)
+        con un conteo real y voluntario — ver research.md, Decisión 5 y 7.
+      security:
+        - bearerAuth: [cajero, encargado_sucursal]
+      parameters:
+        - name: turno_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [monto_contado]
+              properties:
+                monto_contado:
+                  type: number
+                  minimum: 0
+                motivo_diferencia:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Arqueo parcial registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArqueoParcialTurno'
+        '409':
+          description: El turno ya no está abierto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: >-
+            `motivo_diferencia` es obligatorio cuando `monto_contado` no
+            coincide con el monto esperado acumulado (RN-CMF-009)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Consultar el historial de arqueos parciales de un turno (enmienda v1.3)
+      security:
+        - bearerAuth: [cajero, encargado_sucursal, dueno]
+      parameters:
+        - name: turno_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Arqueos parciales ordenados por hora_arqueo ascendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArqueoParcialTurno'
+
+  /catalogos/causas-merma:
+    get:
+      summary: Listar las causas de merma, indicando cuáles son atribuibles a una persona (RF-CMF-015, RF-CMF-017, enmienda v1.2)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: 'es_atribuible_a_persona es la base del cruce merma × cuadre de caja de OT3.4: separa la pérdida sin responsable interno (robo externo, caducidad) de la que sí lo tiene (error humano, fraude interno)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: fraude_interno }
+                    etiqueta: { type: string }
+                    es_atribuible_a_persona: { type: boolean }
+                    requiere_investigacion: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/estados-turno:
+    get:
+      summary: Listar los estados de turno de caja y cuál admite ventas (RF-CMF-017, enmienda v1.2)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: 'admite_ventas saca del código de 001-core-ventas-inventario la condición que valida al registrar una venta contra un turno'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    admite_ventas: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/estados-incidencia:
+    get:
+      summary: Listar los estados de incidencia de cuadre (RF-CMF-017, enmienda v1.2)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: 'Separado de estados-alerta a propósito: son procesos distintos y no deben compartir vocabulario'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/estados-alerta:
+    get:
+      summary: Listar los estados de alerta de fraude en pago (RF-CMF-017, enmienda v1.2)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/resultados-investigacion:
+    get:
+      summary: Listar los resultados posibles de una investigación de merma (RF-CMF-017, enmienda v1.2)
+      security:
+        - bearerAuth: [prevencion_perdidas, gerencia, sistema]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    cierra_investigacion: { type: boolean }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TurnoCaja:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sucursal_id:
+          type: integer
+          format: int64
+        cajero_id:
+          type: integer
+          format: int64
+        hora_apertura:
+          type: string
+          format: date-time
+        monto_inicial:
+          type: number
+        hora_cierre:
+          type: string
+          format: date-time
+          nullable: true
+        monto_contado:
+          type: number
+          nullable: true
+        monto_esperado:
+          type: number
+          nullable: true
+        diferencia:
+          type: number
+          nullable: true
+        motivo_diferencia:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          description: 'código del catálogo estado_turno — enmienda v1.2'
+    MermaCrear:
+      type: object
+      required: [producto_id, sucursal_id, cantidad, valor_estimado]
+      properties:
+        producto_id:
+          type: integer
+          format: int64
+        sucursal_id:
+          type: integer
+          format: int64
+        cantidad:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        valor_estimado:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+    Merma:
+      allOf:
+        - $ref: '#/components/schemas/MermaCrear'
+        - type: object
+          required: [id, fecha_deteccion]
+          properties:
+            id:
+              type: integer
+              format: int64
+            causa:
+              type: string
+              nullable: true
+              description: 'código del catálogo causa_merma — RF-CMF-014, enmienda v1.2. Ya no es un enum fijo del contrato.'
+            resultado_investigacion:
+              type: string
+              nullable: true
+              description: 'código del catálogo resultado_investigacion — enmienda v1.2'
+            fecha_deteccion:
+              type: string
+              format: date-time
+            fecha_resultado:
+              type: string
+              format: date-time
+              nullable: true
+    IncidenciaCuadreCaja:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        turno_caja_id:
+          type: integer
+          format: int64
+        score_anomalia:
+          type: number
+        justificacion:
+          type: string
+        estado:
+          type: string
+          description: 'código del catálogo estado_incidencia — enmienda v1.2'
+        fecha_deteccion:
+          type: string
+          format: date-time
+    AlertaFraudeCrear:
+      type: object
+      required: [venta_id, motivo]
+      properties:
+        venta_id:
+          type: integer
+          format: int64
+        motivo:
+          type: string
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          nullable: true
+        codigo_respuesta_proveedor:
+          type: string
+          nullable: true
+    AlertaFraude:
+      allOf:
+        - $ref: '#/components/schemas/AlertaFraudeCrear'
+        - type: object
+          required: [id, estado, creada_en]
+          properties:
+            id:
+              type: integer
+              format: int64
+            estado:
+              type: string
+              description: 'código del catálogo estado_alerta — enmienda v1.2'
+            creada_en:
+              type: string
+              format: date-time
+            atendida_en:
+              type: string
+              format: date-time
+              nullable: true
+            atendida_por:
+              type: integer
+              format: int64
+              nullable: true
+    PuntoControlHorarioTurno:
+      type: object
+      required: [id, turno_caja_id, hora_checkpoint, monto_esperado_acumulado, generado_en]
+      properties:
+        id:
+          type: integer
+          format: int64
+        turno_caja_id:
+          type: integer
+          format: int64
+        hora_checkpoint:
+          type: string
+          format: date-time
+        monto_esperado_acumulado:
+          type: number
+          minimum: 0
+        generado_en:
+          type: string
+          format: date-time
+    ArqueoParcialTurno:
+      type: object
+      required: [id, turno_caja_id, monto_esperado_acumulado, monto_contado, diferencia, registrado_por, hora_arqueo]
+      properties:
+        id:
+          type: integer
+          format: int64
+        turno_caja_id:
+          type: integer
+          format: int64
+        monto_esperado_acumulado:
+          type: number
+          minimum: 0
+        monto_contado:
+          type: number
+          minimum: 0
+        diferencia:
+          type: number
+          description: Columna generada (monto_contado - monto_esperado_acumulado), solo lectura
+        motivo_diferencia:
+          type: string
+          nullable: true
+        registrado_por:
+          type: integer
+          format: int64
+        hora_arqueo:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

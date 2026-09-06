@@ -1,0 +1,526 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Core de Ventas e Inventario
+  version: 1.5.0
+  description: Contrato de la API del módulo 001-core-ventas-inventario. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /ventas:
+    post:
+      summary: Crear una venta (RF-CVI-001, RF-CVI-005)
+      operationId: crearVenta
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [turno_caja_id, items, metodo_pago]
+              properties:
+                turno_caja_id: { type: integer, description: 'FK externa hacia 006-caja-mermas-fraude' }
+                cliente_id: { type: integer, nullable: true }
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [producto_id, cantidad_venta]
+                    properties:
+                      producto_id: { type: integer }
+                      cantidad_venta: { type: number, format: decimal, minimum: 0.001 }
+                metodo_pago: { type: string, description: 'código del catálogo metodo_pago — ya no es un enum fijo del contrato (enmienda v1.3): agregar un método nuevo deja de ser un cambio de esquema. Ver GET /catalogos/metodos-pago' }
+                descuento_aplicado: { type: number, format: decimal, default: 0 }
+                hora_inicio_cobro: { type: string, format: date-time, nullable: true, description: 'opcional, RF-CVI-017 (enmienda v1.1) — timestamp local del POS al abrir el ticket, para medir el tiempo real de cobro contra OT2.2' }
+                datafono_id: { type: integer, nullable: true, description: 'FK externa hacia 007-pagos-seguridad (enmienda v1.5). Prohibido si metodo_pago=efectivo; obligatorio para tarjeta/electronico cuando la sucursal tiene datáfonos activos registrados (RN-CVI-011)' }
+      responses:
+        '201': { description: Venta creada, content: { application/json: { schema: { $ref: '#/components/schemas/Venta' } } } }
+        '422': { description: 'Producto fraccionable sin factor_conversion (RN-CVI-001); o datafono_id inválido/faltante/sobrante (RN-CVI-011, enmienda v1.5)' }
+        '403': { description: 'turno_caja_id no pertenece a la sucursal del token (Art. 3.3)' }
+
+  /ventas/{id}/pago:
+    patch:
+      summary: Registrar estado de pago (RF-CVI-002)
+      operationId: registrarPagoVenta
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [estado_pago], properties: { estado_pago: { type: string, description: 'código del catálogo estado_pago (enmienda v1.3)' } } }
+      responses:
+        '200': { description: Actualizado }
+
+  /ventas/{id}/descuento:
+    patch:
+      summary: Aplicar descuento (RF-CVI-003)
+      operationId: aplicarDescuentoVenta
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [descuento_aplicado], properties: { descuento_aplicado: { type: number, minimum: 0 } } }
+      responses:
+        '200': { description: Actualizado }
+
+  /ventas/{id}/anular:
+    patch:
+      summary: Anular venta con motivo (RF-CVI-004)
+      operationId: anularVenta
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [motivo_anulacion], properties: { motivo_anulacion: { type: string, minLength: 3 } } }
+      responses:
+        '200': { description: Venta anulada }
+        '422': { description: 'motivo_anulacion ausente' }
+
+  /productos:
+    post:
+      summary: Registrar producto (RF-CVI-006, RF-CVI-007)
+      operationId: crearProducto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, categoria_id, unidad_venta_codigo, unidad_inventario_codigo, es_fraccionable]
+              properties:
+                nombre: { type: string }
+                categoria_id: { type: integer, description: 'FK a categoria — RF-CVI-023, enmienda v1.3. Antes era texto libre.' }
+                codigo_barras: { type: string, nullable: true }
+                unidad_venta_codigo: { type: string, description: 'FK a unidad_medida — RF-CVI-025, enmienda v1.3' }
+                unidad_inventario_codigo: { type: string, description: 'FK a unidad_medida — RF-CVI-025, enmienda v1.3' }
+                es_fraccionable: { type: boolean }
+                factor_conversion: { type: number, nullable: true }
+                es_perecedero: { type: boolean, description: 'opcional desde la enmienda v1.3 — si se omite, se precarga desde categoria.es_perecedero' }
+      responses:
+        '201': { description: Producto creado }
+        '422': { description: 'es_fraccionable=true sin factor_conversion (RN-CVI-001), o es_fraccionable=true con una unidad_venta que no admite decimales (RN-CVI-006, enmienda v1.3)' }
+        '404': { description: 'categoria_id o alguno de los códigos de unidad no existe en su catálogo (enmienda v1.3)' }
+
+  /productos/{id}:
+    patch:
+      summary: Actualizar producto (RF-CVI-007)
+      operationId: actualizarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { nombre: { type: string }, categoria_id: { type: integer }, unidad_venta_codigo: { type: string }, unidad_inventario_codigo: { type: string }, es_fraccionable: { type: boolean }, factor_conversion: { type: number, nullable: true }, es_perecedero: { type: boolean }, activo: { type: boolean } } }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: 'es_fraccionable=true sin factor_conversion (RN-CVI-001), o unidad_venta sin permite_decimales (RN-CVI-006)' }
+        '404': { description: 'categoria_id o código de unidad inexistente (enmienda v1.3)' }
+
+  /inventario/ingresos:
+    post:
+      summary: Ingreso de stock (RF-CVI-008, RF-CVI-009)
+      operationId: registrarIngresoStock
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, cantidad]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                cantidad: { type: number, minimum: 0.001 }
+                fecha_caducidad: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: 'Stock actualizado (y lote creado si aplica)' }
+
+  /inventario/proximos-a-caducar:
+    get:
+      summary: Consultar próximos a caducar (RF-CVI-010)
+      operationId: consultarProximosACaducar
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: sucursal_id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+
+  /inventario/lotes/{id}/retiro:
+    patch:
+      summary: Retiro de lote (RF-CVI-011)
+      operationId: registrarRetiroLote
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [cantidad_retirada, motivo_retiro], properties: { cantidad_retirada: { type: number, minimum: 0.001 }, motivo_retiro: { type: string, minLength: 3 } } }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: 'cantidad_retirada mayor a cantidad_restante' }
+
+  /inventario/stock/{producto_id}:
+    get:
+      summary: Consultar stock en tiempo real (RF-CVI-012)
+      operationId: consultarStock
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK }
+        '403': { description: 'sucursal_id no pertenece al token' }
+
+  /inventario/ajustes:
+    post:
+      summary: Ajuste de inventario (RF-CVI-013, RF-CVI-014)
+      operationId: registrarAjusteInventario
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, cantidad_ajuste, motivo]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                cantidad_ajuste: { type: number }
+                motivo: { type: string, minLength: 3 }
+      responses:
+        '201': { description: Ajuste registrado }
+        '422': { description: 'El ajuste dejaría cantidad_disponible en negativo' }
+
+  /inventario/rotacion/evaluar:
+    post:
+      summary: Proceso batch de rotación (RF-CVI-015, Sistema)
+      operationId: evaluarRotacion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Ejecutado }
+
+  /inventario/sin-rotacion:
+    get:
+      summary: Consultar sin rotación (RF-CVI-016)
+      operationId: consultarSinRotacion
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: sucursal_id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+
+  /productos/{id}/sustitutos:
+    post:
+      summary: Registrar un producto como sustituto de otro (RF-CVI-018, enmienda v1.1)
+      operationId: registrarProductoSustituto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_sustituto_id]
+              properties:
+                producto_sustituto_id: { type: integer }
+                simetrico: { type: boolean, default: true, description: 'si true, también registra la relación inversa (B sustituye a A)' }
+      responses:
+        '201': { description: Sustituto registrado }
+        '422': { description: 'producto_sustituto_id igual a id (RN-CVI-004)' }
+    get:
+      summary: Consultar los sustitutos registrados de un producto (RF-CVI-019, enmienda v1.1)
+      operationId: consultarProductoSustitutos
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    producto_sustituto_id: { type: integer }
+                    activo: { type: boolean }
+
+  /inventario/anaqueles:
+    post:
+      summary: Registrar un anaquel de una sucursal (RF-CVI-022, enmienda v1.4 — layout/anaquel)
+      operationId: registrarAnaquel
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, codigo]
+              properties:
+                sucursal_id: { type: integer }
+                codigo: { type: string, maxLength: 20 }
+                descripcion: { type: string, nullable: true }
+                capacidad_maxima: { type: integer, nullable: true, description: 'NULL = sin límite declarado todavía, nunca se asume 0 ni infinito' }
+      responses:
+        '201': { description: Anaquel creado, content: { application/json: { schema: { $ref: '#/components/schemas/Anaquel' } } } }
+        '409': { description: 'Ya existe un anaquel con ese código en la sucursal' }
+    get:
+      summary: Listar los anaqueles activos de una sucursal (RF-CVI-023, enmienda v1.4)
+      operationId: listarAnaqueles
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: sucursal_id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Anaquel' } } } } }
+
+  /inventario/anaqueles/{id}/productos:
+    get:
+      summary: Consultar qué productos están asignados a un anaquel (RF-CVI-024, enmienda v1.4)
+      operationId: consultarProductosEnAnaquel
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProductoUbicacion' } } } } }
+
+  /productos/{id}/ubicacion:
+    put:
+      summary: Asignar o reasignar la ubicación de un producto en una sucursal (RF-CVI-025, enmienda v1.4)
+      operationId: asignarUbicacionProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, anaquel_id]
+              properties:
+                sucursal_id: { type: integer }
+                anaquel_id: { type: integer }
+      responses:
+        '200': { description: 'Ubicación asignada/actualizada', content: { application/json: { schema: { $ref: '#/components/schemas/ProductoUbicacion' } } } }
+        '409': { description: 'El anaquel ya está en su capacidad máxima (RN-CVI-010)' }
+    get:
+      summary: Consultar la ubicación vigente de un producto en una sucursal (RF-CVI-026, enmienda v1.4)
+      operationId: consultarUbicacionProducto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProductoUbicacion' } } } }
+        '404': { description: 'El producto no tiene ubicación de anaquel asignada en esa sucursal' }
+
+  /inventario/stock/{producto_id}/minimo:
+    patch:
+      summary: Definir o actualizar el nivel mínimo de stock de un producto/sucursal (RF-CVI-021, enmienda v1.2)
+      operationId: actualizarStockMinimo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, stock_minimo]
+              properties:
+                sucursal_id: { type: integer }
+                stock_minimo: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: 'stock_minimo negativo (RN-CVI-005)' }
+        '403': { description: 'sucursal_id no pertenece al alcance del token (Art. 3.3)' }
+
+  /inventario/stock-bajo:
+    get:
+      summary: Consultar productos de una sucursal cuya cantidad_disponible está bajo su stock_minimo (RF-CVI-022, enmienda v1.2)
+      operationId: consultarStockBajo
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: sucursal_id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    producto_id: { type: integer }
+                    cantidad_disponible: { type: number }
+                    stock_minimo: { type: number }
+
+  /catalogos/categorias:
+    get:
+      summary: Listar categorías, opcionalmente en árbol de dos niveles (RF-CVI-024, RF-CVI-026, enmienda v1.3)
+      operationId: listarCategorias
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: solo_activas, in: query, required: false, schema: { type: boolean, default: true } }
+        - { name: como_arbol, in: query, required: false, schema: { type: boolean, default: false }, description: 'true anida las subcategorías dentro de su padre' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Categoria' } }
+    post:
+      summary: Crear una categoría (RF-CVI-024, enmienda v1.3)
+      operationId: crearCategoria
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre: { type: string, maxLength: 60 }
+                categoria_padre_id: { type: integer, nullable: true }
+                es_perecedero: { type: boolean, default: false }
+      responses:
+        '201': { description: Categoría creada }
+        '409': { description: 'nombre ya existente' }
+        '422': { description: 'la categoría padre ya tiene padre — la jerarquía admite dos niveles (RN-CVI-008)' }
+
+  /catalogos/categorias/{id}:
+    patch:
+      summary: Actualizar o dar de baja una categoría (RF-CVI-024, enmienda v1.3)
+      operationId: actualizarCategoria
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string, maxLength: 60 }
+                categoria_padre_id: { type: integer, nullable: true }
+                es_perecedero: { type: boolean }
+                activo: { type: boolean }
+      responses:
+        '200': { description: Actualizada }
+        '409': { description: 'intento de dar de baja (activo=false) una categoría con productos activos — reasignarlos primero (enmienda v1.3)' }
+        '422': { description: 'categoria_padre_id = id (RN-CVI-007), o jerarquía de más de dos niveles (RN-CVI-008)' }
+
+  /catalogos/unidades-medida:
+    get:
+      summary: Listar unidades de medida disponibles (RF-CVI-025, RF-CVI-026, enmienda v1.3)
+      operationId: listarUnidadesMedida
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/UnidadMedida' } }
+
+  /catalogos/metodos-pago:
+    get:
+      summary: Listar métodos de pago aceptados, para el selector del POS (RF-CVI-026, enmienda v1.3)
+      operationId: listarMetodosPago
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_electronico: { type: boolean, description: 'define el numerador del KPI de adopción de pago electrónico de OT2.2' }
+                    orden: { type: integer }
+
+  /catalogos/estados-venta:
+    get:
+      summary: Listar estados de venta y si cuentan para ingresos (RF-CVI-026, enmienda v1.3)
+      operationId: listarEstadosVenta
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    cuenta_para_ingresos: { type: boolean, description: 'una venta anulada no suma al margen de OT1.1 ni al ticket promedio de OT1.4' }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Anaquel:
+      type: object
+      properties:
+        id: { type: integer }
+        sucursal_id: { type: integer }
+        codigo: { type: string }
+        descripcion: { type: string, nullable: true }
+        capacidad_maxima: { type: integer, nullable: true }
+        activo: { type: boolean }
+        productos_asignados: { type: integer, description: 'contador calculado, no una columna — cuántos productos tienen este anaquel como ubicación vigente' }
+    ProductoUbicacion:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        anaquel_id: { type: integer }
+        asignado_por: { type: integer }
+        actualizado_en: { type: string, format: date-time }
+    Venta:
+      type: object
+      properties:
+        id: { type: integer }
+        numero_documento: { type: string, description: 'columna GENERATED, formato V-00000001 (enmienda v1.2, RF-CVI-020)' }
+        sucursal_id: { type: integer }
+        turno_caja_id: { type: integer }
+        total: { type: number }
+        metodo_pago: { type: string, description: 'código del catálogo metodo_pago (enmienda v1.3) — sigue siendo el string legible, no un id' }
+        estado_venta: { type: string, description: 'código del catálogo estado_venta (enmienda v1.3)' }
+        datafono_id: { type: integer, nullable: true, description: 'FK externa hacia 007-pagos-seguridad (enmienda v1.5)' }
+    Categoria:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        categoria_padre_id: { type: integer, nullable: true }
+        es_perecedero: { type: boolean, description: 'valor por defecto que hereda el producto al crearse; producto.es_perecedero manda' }
+        activo: { type: boolean }
+        subcategorias:
+          type: array
+          description: 'presente solo cuando se consulta con como_arbol=true'
+          items: { $ref: '#/components/schemas/Categoria' }
+    UnidadMedida:
+      type: object
+      properties:
+        codigo: { type: string, example: libra }
+        etiqueta: { type: string, example: Libra }
+        permite_decimales: { type: boolean, description: 'habilita RN-CVI-006: un producto fraccionable exige una unidad que admita decimales' }
+        orden: { type: integer }
+        activo: { type: boolean }

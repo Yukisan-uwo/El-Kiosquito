@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Prevención de Pérdidas y Seguridad
+  version: 1.0.0
+  description: Contrato de la API del módulo 006-prevencion-perdidas-seguridad. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /perdidas/mermas:
+    post:
+      summary: Registrar una merma detectada, sin causa todavía (OO-PP01)
+      operationId: crearMerma
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, cantidad, valor_estimado]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                cantidad: { type: number, format: decimal, minimum: 0.001 }
+                valor_estimado: { type: number, format: decimal, minimum: 0.01 }
+      responses:
+        '201': { description: Merma registrada, content: { application/json: { schema: { $ref: '#/components/schemas/Merma' } } } }
+    get:
+      summary: Consultar mermas por sucursal, periodo y causa (OO-PP03)
+      operationId: consultarMermas
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: sucursal_id, in: query, required: false, schema: { type: integer } }
+        - { name: causa, in: query, required: false, schema: { type: string } }
+        - { name: desde, in: query, required: false, schema: { type: string, format: date } }
+        - { name: hasta, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Merma' }
+
+  /perdidas/mermas/{id}/causa:
+    patch:
+      summary: Asignar la causa de una merma (OO-PP02)
+      operationId: asignarCausaMerma
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [causa]
+              properties:
+                causa: { type: string, enum: [robo_externo, error_humano, fraude_interno, caducidad] }
+      responses:
+        '200': { description: Actualizado }
+
+  /perdidas/mermas/{id}/resultado:
+    patch:
+      summary: Registrar el resultado de la investigación de una merma (OO-PP08)
+      operationId: registrarResultadoMerma
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resultado_investigacion]
+              properties:
+                resultado_investigacion: { type: string, enum: [confirmada, descartada] }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: 'La merma no tiene causa asignada todavía (RN-PP-001)' }
+
+  /perdidas/cuadres-caja/diferencias:
+    get:
+      summary: Consultar las diferencias de cuadre de caja por sucursal/cajero (OO-PP04, solo lectura sobre 001)
+      operationId: consultarDiferenciasCuadre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: sucursal_id, in: query, required: false, schema: { type: integer } }
+        - { name: cajero_id, in: query, required: false, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    turno_caja_id: { type: integer }
+                    cajero_id: { type: integer }
+                    diferencia: { type: number }
+
+  /perdidas/incidencias-cuadre:
+    post:
+      summary: Registrar una incidencia de posible fraude interno sobre un turno de caja (OO-PP05, Sistema)
+      operationId: crearIncidenciaCuadre
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [turno_caja_id, score_anomalia, justificacion]
+              properties:
+                turno_caja_id: { type: integer }
+                score_anomalia: { type: number, format: decimal }
+                justificacion: { type: string, minLength: 10 }
+      responses:
+        '201': { description: Incidencia creada, content: { application/json: { schema: { $ref: '#/components/schemas/IncidenciaCuadreCaja' } } } }
+        '409': { description: 'Ya existe una incidencia pendiente para este turno_caja_id' }
+
+  /perdidas/datafonos:
+    post:
+      summary: Registrar un datáfono
+      operationId: crearDatafono
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sucursal_id, codigo_serie]
+              properties:
+                sucursal_id: { type: integer }
+                codigo_serie: { type: string }
+      responses:
+        '201': { description: Datáfono registrado }
+
+  /perdidas/datafonos/{id}/revisiones:
+    post:
+      summary: Registrar la revisión de seguridad de un datáfono (OO-PP06)
+      operationId: registrarRevisionDatafono
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [actualizado, vencido] }
+                observaciones: { type: string, nullable: true }
+      responses:
+        '201': { description: Revisión registrada }
+
+  /alertas-fraude-pago/{id}/atender:
+    patch:
+      summary: Atender una alerta de posible fraude en un pago con tarjeta (OO-PP07, única escritura cruzada sobre 001-ventas-y-caja, ver Decisión 3 de research.md)
+      operationId: atenderAlertaFraudePago
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                codigo_respuesta_proveedor: { type: string, nullable: true }
+      responses:
+        '200': { description: Alerta marcada como atendida }
+        '422': { description: 'La alerta ya estaba atendida (RN-PP-002)' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Merma:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        cantidad: { type: number }
+        valor_estimado: { type: number }
+        causa: { type: string, nullable: true }
+        resultado_investigacion: { type: string, nullable: true }
+    IncidenciaCuadreCaja:
+      type: object
+      properties:
+        id: { type: integer }
+        turno_caja_id: { type: integer }
+        score_anomalia: { type: number }
+        justificacion: { type: string }
+        estado: { type: string }

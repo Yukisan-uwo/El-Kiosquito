@@ -1,0 +1,258 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Compras y Proveedores
+  version: 1.0.0
+  description: Contrato de la API del módulo 008-compras-proveedores. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /proveedores:
+    post:
+      summary: Registrar un proveedor (OO-CP01)
+      operationId: crearProveedor
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre: { type: string }
+                contacto: { type: string, nullable: true }
+      responses:
+        '201': { description: Proveedor creado, content: { application/json: { schema: { $ref: '#/components/schemas/Proveedor' } } } }
+
+  /proveedores/{id}:
+    patch:
+      summary: Actualizar un proveedor (OO-CP01)
+      operationId: actualizarProveedor
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string }
+                contacto: { type: string, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+
+  /proveedores/{id}/desactivar:
+    patch:
+      summary: Dar de baja un proveedor, sin afectar sus órdenes existentes (OO-CP09)
+      operationId: desactivarProveedor
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Proveedor desactivado }
+
+  /compras/ordenes:
+    post:
+      summary: Registrar una orden de compra (OO-CP02)
+      operationId: crearOrdenCompra
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proveedor_id, sucursal_id, items, forma_pago]
+              properties:
+                proveedor_id: { type: integer }
+                sucursal_id: { type: integer }
+                es_oferta: { type: boolean, default: false }
+                forma_pago: { type: string, description: 'código del catálogo forma_pago — RF-CP-012 (v1.1), FK desde la enmienda v1.2. Ya no es un enum fijo del contrato.' }
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [producto_id, cantidad_pedida, precio_ofrecido]
+                    properties:
+                      producto_id: { type: integer }
+                      cantidad_pedida: { type: number, format: decimal, minimum: 0.001 }
+                      precio_ofrecido: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: Orden creada en estado pendiente, content: { application/json: { schema: { $ref: '#/components/schemas/OrdenCompra' } } } }
+        '403': { description: 'sucursal_id no pertenece al alcance del token (Art. 3.3)' }
+
+  /compras/ordenes/{detalle_id}/recepciones:
+    post:
+      summary: Registrar un evento de recepción de una línea de la orden (OO-CP03, OO-CP04)
+      operationId: registrarRecepcion
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: detalle_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cantidad_recibida_evento]
+              properties:
+                cantidad_recibida_evento: { type: number, format: decimal, minimum: 0.001 }
+                numero_documento_proveedor: { type: string, nullable: true, description: 'factura o guía de remisión del proveedor, opcional — RF-CP-013, enmienda v1.1' }
+      responses:
+        '201': { description: 'Recepción registrada; cantidad_recibida y estado de la orden recalculados' }
+        '422': { description: 'Orden es_oferta=true sin pronostico_consultado=true en este detalle (RN-CP-001)' }
+
+  /compras/productos/{producto_id}/historial-costo:
+    get:
+      summary: Consultar el historial de variación de costo de un producto por proveedor (OO-CP05)
+      operationId: consultarHistorialCosto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistorialCostoProducto' }
+
+  /compras/productos/{producto_id}/comparativa-proveedores:
+    get:
+      summary: Comparar el costo vigente de un producto entre distintos proveedores (OO-CP06)
+      operationId: consultarComparativaProveedores
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: 'Último costo registrado por cada proveedor (Decisión 2 de research.md)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistorialCostoProducto' }
+
+  /compras/productos/{producto_id}/pronostico:
+    get:
+      summary: Consultar el pronóstico de demanda antes de confirmar una compra por oferta (RF-CP-009). Integra en vivo GET /pronostico/{producto_id} de 004-pronostico-demanda (Decisión 4 de research.md) — ya no es un stub.
+      operationId: consultarPronosticoParaCompra
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+        - { name: detalle_id, in: query, required: false, schema: { type: integer }, description: 'si se pasa, marca pronostico_consultado=true en ese detalle_orden_compra' }
+      responses:
+        '200':
+          description: 'Pronóstico consultado desde 004-pronostico-demanda'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [producto_id, datos_suficientes]
+                properties:
+                  producto_id: { type: integer }
+                  datos_suficientes: { type: boolean, description: 'false si 004-pronostico-demanda no tiene ciclo calculado para este producto/sucursal' }
+                  cantidad_recomendada: { type: number, nullable: true, description: 'null si datos_suficientes=false' }
+
+  /compras/ordenes/{detalle_id}/motivo-oferta:
+    patch:
+      summary: Registrar el motivo cuando una compra por oferta no siguió la recomendación del pronóstico (OO-CP08)
+      operationId: registrarMotivoOferta
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: detalle_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo_no_siguio_pronostico]
+              properties:
+                motivo_no_siguio_pronostico: { type: string, minLength: 3 }
+      responses:
+        '200': { description: Actualizado }
+
+  /catalogos/formas-pago:
+    get:
+      summary: Listar las formas de pago a proveedor con su plazo por defecto (RF-CP-015, RF-CP-016, enmienda v1.2)
+      operationId: listarFormasPago
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'dias_plazo_default permite anticipar cuándo hay que pagar una orden a crédito (OT1.3) — dato que antes no existía en el modelo'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: credito }
+                    etiqueta: { type: string }
+                    dias_plazo_default: { type: integer, description: '0 para contado' }
+                    activo: { type: boolean }
+
+  /catalogos/estados-orden-compra:
+    get:
+      summary: Listar los estados de orden de compra y cuáles admiten recepciones (RF-CP-016, enmienda v1.2)
+      operationId: listarEstadosOrdenCompra
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'permite_recepcion saca del servicio la regla de qué órdenes admiten más recepciones (RN-CP-002). El estado sigue siendo derivado y no editable (RNF-CP-001).'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    permite_recepcion: { type: boolean }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Proveedor:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        contacto: { type: string, nullable: true }
+        activo: { type: boolean }
+    OrdenCompra:
+      type: object
+      properties:
+        id: { type: integer }
+        proveedor_id: { type: integer }
+        sucursal_id: { type: integer }
+        es_oferta: { type: boolean }
+        forma_pago: { type: string, description: 'código del catálogo forma_pago — enmienda v1.2' }
+        estado: { type: string, description: 'código del catálogo estado_orden_compra — derivado, nunca editable (RNF-CP-001); FK desde la enmienda v1.2' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DetalleOrdenCompra' }
+    DetalleOrdenCompra:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        cantidad_pedida: { type: number }
+        cantidad_recibida: { type: number, description: 'valor derivado, ver Decisión 1 de research.md' }
+        precio_ofrecido: { type: number }
+        pronostico_consultado: { type: boolean }
+        motivo_no_siguio_pronostico: { type: string, nullable: true }
+    HistorialCostoProducto:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        proveedor_id: { type: integer }
+        costo: { type: number }
+        fecha: { type: string, format: date-time }

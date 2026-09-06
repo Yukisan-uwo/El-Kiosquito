@@ -1,0 +1,350 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito - Pronóstico de Demanda
+  description: >
+    Contrato del módulo 004-pronostico-demanda. Dueño de `demanda_insatisfecha`
+    (captura cruda desde el POS) y `pronostico_demanda` (resultado append-only
+    del modelo de pronóstico). No implementa el modelo en sí.
+  version: "1.0.0"
+servers:
+  - url: /api/v1
+
+paths:
+  /pronostico/demanda-insatisfecha:
+    post:
+      summary: Registrar un evento de demanda insatisfecha (RF-PD-001, RF-PD-002)
+      security:
+        - bearerAuth: [cajero, encargado_sucursal, gerencia]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemandaInsatisfechaCrear'
+      responses:
+        '201':
+          description: Evento registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemandaInsatisfecha'
+        '403':
+          description: sucursal_id no pertenece al alcance del token (Art. 3.3)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Consultar histórico de demanda insatisfecha por producto/sucursal/rango (RF-PD-003)
+      security:
+        - bearerAuth: [encargado_sucursal, compras, gerencia, sistema]
+      parameters:
+        - name: producto_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: sucursal_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: desde
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: hasta
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lista de eventos en el rango
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DemandaInsatisfecha'
+
+  /pronostico/ciclos:
+    post:
+      summary: Registrar un ciclo de pronóstico de demanda calculado por el modelo (RF-PD-004)
+      security:
+        - bearerAuth: [sistema]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PronosticoCrear'
+      responses:
+        '201':
+          description: Ciclo de pronóstico registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pronostico'
+        '422':
+          description: Falta tamaño de muestra o periodo (Art. 5.9)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /pronostico/{producto_id}:
+    get:
+      summary: Consultar el pronóstico de demanda más reciente de un producto/sucursal (RF-PD-005, RN-PD-001)
+      security:
+        - bearerAuth: [compras, encargado_sucursal, gerencia]
+      parameters:
+        - name: producto_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: sucursal_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Pronóstico más reciente, o declaración explícita de datos insuficientes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PronosticoConsulta'
+
+  /pronostico/eventos-locales:
+    post:
+      summary: Registrar un evento local que puede afectar la demanda (RF-PD-007, enmienda v1.1)
+      security:
+        - bearerAuth: [encargado_sucursal, gerencia, compras]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventoLocalCrear'
+      responses:
+        '201':
+          description: Evento local registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventoLocal'
+        '422':
+          description: fecha_fin anterior a fecha_inicio, o descripción vacía
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Consultar eventos locales por rango de fechas, opcionalmente por sucursal (RF-PD-008, enmienda v1.1)
+      security:
+        - bearerAuth: [encargado_sucursal, gerencia, compras, sistema]
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: hasta
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: sucursal_id
+          in: query
+          required: false
+          description: Si se omite, devuelve tanto los eventos de toda la cadena (sucursal_id NULL) como los de todas las sucursales dentro del rango
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de eventos locales en el rango
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventoLocal'
+
+  /catalogos/tipos-evento-local:
+    get:
+      summary: Listar los tipos de evento local con el signo esperado de su efecto sobre la demanda (RF-PD-010, enmienda v1.2)
+      operationId: listarTiposEventoLocal
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 'El modelo de pronóstico lee de aquí si cada tipo empuja la demanda al alza o a la baja, en vez de inferirlo de los datos (RN-PD-003)'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo:
+                      type: string
+                      example: corte_servicios
+                    etiqueta:
+                      type: string
+                    afecta_demanda_al_alza:
+                      type: boolean
+                      description: 'true = feriado, fiesta patronal, evento comunitario. false = clima extremo, corte de servicios.'
+                    activo:
+                      type: boolean
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    DemandaInsatisfechaCrear:
+      type: object
+      required: [producto_id, sucursal_id, hora_evento]
+      properties:
+        producto_id:
+          type: integer
+          format: int64
+        sucursal_id:
+          type: integer
+          format: int64
+        hora_evento:
+          type: string
+          format: date-time
+        sustituto_ofrecido_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            (Enmienda v1.1, RF-PD-006) id del producto sustituto ofrecido, de la tabla
+            producto_sustituto de 001-core-ventas-inventario. Opcional.
+        sustituto_aceptado:
+          type: boolean
+          nullable: true
+          description: >-
+            (Enmienda v1.1, RF-PD-006) NULL si no se ofreció ningún sustituto; obligatorio
+            (true/false) si sustituto_ofrecido_id viene informado.
+    DemandaInsatisfecha:
+      allOf:
+        - $ref: '#/components/schemas/DemandaInsatisfechaCrear'
+        - type: object
+          required: [id, cajero_id, hora_registro]
+          properties:
+            id:
+              type: integer
+              format: int64
+            cajero_id:
+              type: integer
+              format: int64
+            hora_registro:
+              type: string
+              format: date-time
+    PronosticoCrear:
+      type: object
+      required: [producto_id, sucursal_id, cantidad_recomendada, tamano_muestra, periodo_inicio, periodo_fin]
+      properties:
+        producto_id:
+          type: integer
+          format: int64
+        sucursal_id:
+          type: integer
+          format: int64
+        cantidad_recomendada:
+          type: number
+          minimum: 0
+        tamano_muestra:
+          type: integer
+          minimum: 1
+        periodo_inicio:
+          type: string
+          format: date
+        periodo_fin:
+          type: string
+          format: date
+    Pronostico:
+      allOf:
+        - $ref: '#/components/schemas/PronosticoCrear'
+        - type: object
+          required: [id, fecha_calculo]
+          properties:
+            id:
+              type: integer
+              format: int64
+            fecha_calculo:
+              type: string
+              format: date-time
+    PronosticoConsulta:
+      type: object
+      required: [datos_suficientes]
+      properties:
+        datos_suficientes:
+          type: boolean
+        pronostico:
+          $ref: '#/components/schemas/Pronostico'
+          nullable: true
+    EventoLocalCrear:
+      type: object
+      required: [fecha_inicio, fecha_fin, tipo, descripcion]
+      properties:
+        sucursal_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: NULL significa que afecta a toda la cadena (p. ej. un feriado nacional)
+        fecha_inicio:
+          type: string
+          format: date
+        fecha_fin:
+          type: string
+          format: date
+        tipo:
+          type: string
+          description: 'código del catálogo tipo_evento_local — RF-PD-009, enmienda v1.2. Ya no es un enum fijo del contrato: agregar un tipo de evento nuevo deja de ser un cambio de esquema. Ver GET /catalogos/tipos-evento-local.'
+        descripcion:
+          type: string
+          minLength: 3
+    EventoLocal:
+      allOf:
+        - $ref: '#/components/schemas/EventoLocalCrear'
+        - type: object
+          required: [id, registrado_por, creado_en]
+          properties:
+            id:
+              type: integer
+              format: int64
+            registrado_por:
+              type: integer
+              format: int64
+            creado_en:
+              type: string
+              format: date-time
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

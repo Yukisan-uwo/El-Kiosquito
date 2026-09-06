@@ -1,0 +1,15 @@
+# Dependencias del paquete etl/ además de lo que ya trae la imagen base de
+# Airflow (usadas por dags/etl_el_kiosquito.py y por etl/main.py cuando se
+# corre standalone fuera de Airflow).
+psycopg[binary]==3.2.3
+clickhouse-driver==0.2.11
+requests==2.34.2
+bcrypt==4.2.1
+
+# Capa estratégica (Art. 5.6) — paquete ml/, los 5 modelos scikit-learn.
+# Versiones verificadas juntas (import real + entrenamiento real de los 5
+# modelos) contra Python 3.11.15, la misma versión de la imagen
+# apache/airflow:2.10.3-python3.11 del Dockerfile.
+numpy==2.4.4
+pandas==3.0.2
+scikit-learn==1.8.0

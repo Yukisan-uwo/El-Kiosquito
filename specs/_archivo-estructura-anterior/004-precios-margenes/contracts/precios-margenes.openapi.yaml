@@ -1,0 +1,172 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Precios y Márgenes
+  version: 1.0.0
+  description: Contrato de la API del módulo 004-precios-margenes. Ver spec.md para requisitos y data-model.md para el esquema completo.
+servers:
+  - url: /api/v1
+paths:
+  /precios:
+    post:
+      summary: Registrar o actualizar el precio de venta de un producto por sucursal (OO-PM01)
+      operationId: registrarPrecio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, precio_venta]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                precio_venta: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: 'Precio registrado; cualquier recomendación pendiente de este producto/sucursal pasa a obsoleta', content: { application/json: { schema: { $ref: '#/components/schemas/HistorialPrecioProducto' } } } }
+        '403': { description: 'sucursal_id no pertenece al alcance del token (Art. 3.3)' }
+
+  /precios/{producto_id}/margen:
+    get:
+      summary: Consultar el margen real de un producto (OO-PM02)
+      operationId: consultarMargenReal
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: 'Margen calculado, o datos_suficientes=false si falta precio o costo (RNF-PM-001)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MargenReal' }
+
+  /precios/competencia:
+    post:
+      summary: Registrar el precio de referencia de la competencia (OO-PM03)
+      operationId: registrarPrecioCompetencia
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, fuente, precio_referencia]
+              properties:
+                producto_id: { type: integer }
+                fuente: { type: string }
+                precio_referencia: { type: number, format: decimal, minimum: 0 }
+      responses:
+        '201': { description: Registrado }
+
+  /precios/{producto_id}/comparativa-competencia:
+    get:
+      summary: Comparar el precio propio vigente contra el precio de competencia más reciente (OO-PM04)
+      operationId: consultarComparativaCompetencia
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: producto_id, in: path, required: true, schema: { type: integer } }
+        - { name: sucursal_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ComparativaCompetencia' } } } }
+
+  /precios/clasificacion/{producto_id}:
+    patch:
+      summary: Marcar un producto como gancho o nicho, a nivel de cadena (OO-PM05)
+      operationId: clasificarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: producto_id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clasificacion]
+              properties:
+                clasificacion: { type: string, enum: [gancho, nicho] }
+      responses:
+        '200': { description: Actualizado }
+
+  /precios/recomendaciones:
+    post:
+      summary: Registrar una recomendación de precio generada por el motor de pricing dinámico (OO-PM06, Sistema)
+      operationId: crearRecomendacionPrecio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [producto_id, sucursal_id, precio_recomendado, justificacion]
+              properties:
+                producto_id: { type: integer }
+                sucursal_id: { type: integer }
+                precio_recomendado: { type: number, format: decimal, minimum: 0 }
+                justificacion: { type: string, minLength: 10 }
+      responses:
+        '201': { description: Recomendación creada en estado pendiente, content: { application/json: { schema: { $ref: '#/components/schemas/RecomendacionPrecio' } } } }
+        '409': { description: 'Ya existe una recomendación pendiente para este producto/sucursal (RN-PM-001)' }
+
+  /precios/recomendaciones/{id}/resolucion:
+    patch:
+      summary: Aceptar o rechazar una recomendación de precio pendiente (OO-PM07)
+      operationId: resolverRecomendacionPrecio
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [aceptada, rechazada] }
+      responses:
+        '200': { description: 'Resuelta; si fue aceptada, se creó una nueva entrada en historial_precio_producto con fuente=motor_dinamico' }
+        '409': { description: 'La recomendación ya no está pendiente (ya fue resuelta u obsoleta)' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HistorialPrecioProducto:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        precio_venta: { type: number }
+        fuente: { type: string }
+        vigente_desde: { type: string, format: date-time }
+    MargenReal:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        datos_suficientes: { type: boolean }
+        precio_venta_vigente: { type: number, nullable: true }
+        costo_reposicion_vigente: { type: number, nullable: true }
+        margen_real: { type: number, nullable: true }
+    ComparativaCompetencia:
+      type: object
+      properties:
+        producto_id: { type: integer }
+        precio_propio_vigente: { type: number, nullable: true }
+        precio_competencia_mas_reciente: { type: number, nullable: true }
+        fuente_competencia: { type: string, nullable: true }
+    RecomendacionPrecio:
+      type: object
+      properties:
+        id: { type: integer }
+        producto_id: { type: integer }
+        sucursal_id: { type: integer }
+        precio_actual_snapshot: { type: number }
+        precio_recomendado: { type: number }
+        justificacion: { type: string }
+        estado: { type: string }

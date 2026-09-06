@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: El Kiosquito — Analítica y Reportes (BI)
+  version: 1.2.0
+  description: Contrato de la API del módulo 011-analitica-reportes. Ver spec.md para requisitos y data-model.md para el esquema completo. v1.1.0 (enmienda v1.4.0 de la constitución) agrega /analitica/asistente/preguntar, el endpoint interactivo real del asistente conversacional. v1.2.0 (2026-09-06) agrega /analitica/reportes/*, los 3 endpoints REST reales que sirven los KPIs compuestos de ClickHouse (margen, merma, ticket promedio por sucursal) al Dashboard Dueño del frontend — antes de esta enmienda esos datos solo eran alcanzables indirectamente vía el asistente conversacional, un vacío de arquitectura encontrado al construir el frontend.
+servers:
+  - url: /api/v1
+paths:
+  /analitica/pipeline/ejecuciones:
+    post:
+      summary: Registrar la ejecución de un ciclo del pipeline ETL (llamado por el DAG de Airflow al iniciar/finalizar) (OO-AR01)
+      operationId: registrarEjecucionPipeline
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dag_run_id, estado]
+              properties:
+                dag_run_id: { type: string }
+                estado: { type: string, description: 'código del catálogo estado_ejecucion — RF-AR-008, enmienda v1.1' }
+                sucursales_procesadas: { type: integer }
+                filas_cargadas: { type: integer }
+                mensaje_error: { type: string, nullable: true }
+      responses:
+        '201': { description: Registrado, content: { application/json: { schema: { $ref: '#/components/schemas/EjecucionPipeline' } } } }
+
+  /analitica/pipeline/estado:
+    get:
+      summary: Consultar el estado y la salud del último ciclo del pipeline ETL (OO-AR02)
+      operationId: consultarEstadoPipeline
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EjecucionPipeline' }
+
+  /analitica/pipeline/validaciones:
+    post:
+      summary: Registrar la validación de calidad de los datos cargados en un ciclo (OO-AR05)
+      operationId: registrarValidacionCalidad
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ejecucion_id, regla_validada, aprobado]
+              properties:
+                ejecucion_id: { type: integer }
+                regla_validada: { type: string }
+                aprobado: { type: boolean }
+                detalle: { type: string, nullable: true }
+      responses:
+        '201': { description: Registrada }
+
+  /analitica/modelos/versiones:
+    post:
+      summary: Registrar el entrenamiento y despliegue de una versión de un modelo de ML (OO-AR03, Art. 5.9)
+      operationId: registrarVersionModelo
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modelo, version, tamano_muestra, periodo_inicio, periodo_fin, nombre_metrica]
+              properties:
+                modelo: { type: string, description: 'código del catálogo modelo_ml — RF-AR-008, enmienda v1.1. Los 5 modelos siguen siendo los del Art. 5.6; el catálogo solo deja de tenerlos dentro de un CHECK.' }
+                version: { type: string }
+                tamano_muestra: { type: integer, minimum: 0 }
+                periodo_inicio: { type: string, format: date }
+                periodo_fin: { type: string, format: date }
+                nombre_metrica: { type: string }
+                valor_metrica: { type: number, nullable: true }
+      responses:
+        '201':
+          description: 'Versión registrada — estado=activo si tamano_muestra alcanza el umbral del modelo, o descartado_datos_insuficientes en caso contrario (RN-AR-002)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionModeloML' }
+
+  /analitica/modelos/{modelo}/metricas:
+    get:
+      summary: Consultar las métricas de desempeño de la versión activa de un modelo (OO-AR04)
+      operationId: consultarMetricasModeloActivo
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: modelo, in: path, required: true, schema: { type: string }, description: 'código del catálogo modelo_ml — enmienda v1.1' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionModeloML' }
+        '404': { description: 'Ningún modelo activo para este tipo (todavía descartado por datos insuficientes o nunca entrenado)' }
+
+  /analitica/asistente/preguntas:
+    post:
+      summary: Registrar una pregunta en lenguaje natural del Dueño, la consulta estructurada real generada y la respuesta (OO-AR06, Art. 5.10). Exclusivo del rol dueno (RNF-AR-003). Registro de auditoría "externo" — pregunta/consulta/respuesta ya computadas por quien llama. El flujo real del Dueño es /analitica/asistente/preguntar, que persiste acá internamente.
+      operationId: registrarPreguntaAsistente
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pregunta_texto, consulta_generada, respuesta_texto]
+              properties:
+                pregunta_texto: { type: string }
+                consulta_generada: { type: string, description: 'consulta estructurada real ejecutada, nunca vacía (RN-AR-003)' }
+                respuesta_texto: { type: string }
+      responses:
+        '201': { description: Registrada }
+        '403': { description: 'Rol distinto de dueno (RNF-AR-003)' }
+    get:
+      summary: Consultar el historial de preguntas y respuestas del asistente conversacional (OO-AR07). Exclusivo del rol dueno.
+      operationId: consultarHistorialAsistente
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PreguntaAsistente' }
+        '403': { description: 'Rol distinto de dueno (RNF-AR-003)' }
+
+  /analitica/asistente/preguntar:
+    post:
+      summary: 'Endpoint interactivo real del asistente conversacional (OO-AR06, Art. 5.10, enmienda v1.4.0) — el que consume el frontend. Recibe solo la pregunta en lenguaje natural; el backend orquesta OpenRouter con un catálogo cerrado de tools de solo lectura contra PostgreSQL/ClickHouse (nunca SQL libre del LLM), y persiste el resultado con la misma regla RN-AR-003 que el registro externo. Exclusivo del rol dueno (RNF-AR-003).'
+      operationId: preguntarAsistente
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pregunta_texto]
+              properties:
+                pregunta_texto: { type: string }
+      responses:
+        '201':
+          description: 'Pregunta respondida y registrada. consulta_generada refleja el/los tool call(s) reales que el LLM invocó (nombre + argumentos) — nunca una cadena vacía, ver RN-AR-003.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PreguntaAsistente' }
+        '403': { description: 'Rol distinto de dueno (RNF-AR-003)' }
+        '502': { description: 'Falla de OpenRouter (proveedor externo caído, API key inválida o no configurada) — nunca un 500 genérico' }
+
+  /analitica/reportes/margen-por-sucursal:
+    get:
+      summary: 'Margen real por sucursal en un rango de fechas (OT1.1, enmienda v1.2, 2026-09-06) — el KPI compuesto consolidado de red que el Dashboard Dueño del frontend pinta al cargar. Consulta agregada directa contra ClickHouse (fact_venta_linea × dim_sucursal), nunca contra PostgreSQL. Exclusivo del rol dueno (mismo criterio que el asistente conversacional — es la comparación consolidada de RED completa, cada rol operativo ya tiene su propia analítica scopeada por sucursal en los módulos 001/003/006).'
+      operationId: consultarMargenPorSucursal
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: desde, in: query, required: true, schema: { type: string, format: date } }
+        - { name: hasta, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK — una fila por sucursal con al menos una línea de venta que cuenta para ingresos en el rango
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MargenPorSucursal' }
+        '403': { description: 'Rol distinto de dueno' }
+        '502': { description: 'ClickHouse no disponible — nunca un 500 genérico (ver nota de manejo de errores en research.md, Decisión 7)' }
+
+  /analitica/reportes/merma-por-sucursal:
+    get:
+      summary: 'Merma por sucursal en un rango de fechas (OT1.2, enmienda v1.2, 2026-09-06). Consulta agregada directa contra ClickHouse (fact_merma × dim_sucursal). Exclusivo del rol dueno, mismo criterio que margen-por-sucursal.'
+      operationId: consultarMermaPorSucursal
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: desde, in: query, required: true, schema: { type: string, format: date } }
+        - { name: hasta, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MermaPorSucursal' }
+        '403': { description: 'Rol distinto de dueno' }
+        '502': { description: 'ClickHouse no disponible — nunca un 500 genérico' }
+
+  /analitica/reportes/ticket-promedio-por-sucursal:
+    get:
+      summary: 'Ticket promedio por sucursal en un rango de fechas (OT1.4, enmienda v1.2, 2026-09-06). ticket_promedio = Σsubtotal_linea / count(DISTINCT venta_id) — se cuenta por venta, no por línea, porque fact_venta_linea es de grano línea. Consulta agregada directa contra ClickHouse. Exclusivo del rol dueno, mismo criterio que los dos anteriores.'
+      operationId: consultarTicketPromedioPorSucursal
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: desde, in: query, required: true, schema: { type: string, format: date } }
+        - { name: hasta, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TicketPromedioPorSucursal' }
+        '403': { description: 'Rol distinto de dueno' }
+        '502': { description: 'ClickHouse no disponible — nunca un 500 genérico' }
+
+  /catalogos/modelos-ml:
+    get:
+      summary: Listar los 5 modelos de ML con su algoritmo, métrica principal y módulo consumidor (RF-AR-008, RF-AR-009, enmienda v1.1)
+      operationId: listarModelosMl
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'metrica_principal habilita RN-AR-004: una versión no puede registrarse con una métrica que no corresponde a su modelo. modulo_consumidor responde "si retiro este modelo, ¿qué se rompe?" sin leer los 11 documentos.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string, example: anomalias_caja }
+                    etiqueta: { type: string }
+                    algoritmo: { type: string, example: Isolation Forest }
+                    metrica_principal: { type: string, example: F1 }
+                    modulo_consumidor: { type: string, example: 006-caja-mermas-fraude }
+                    activo: { type: boolean }
+
+  /catalogos/estados-version-modelo:
+    get:
+      summary: Listar los estados de versión de modelo y cuál es servible (RF-AR-009, enmienda v1.1)
+      operationId: listarEstadosVersionModelo
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 'es_version_servible saca del código la regla de qué versión responde consultas: solo la activa. Una versión descartada existe como registro de honestidad (Art. 5.9), no para servir predicciones.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_version_servible: { type: boolean }
+                    exige_motivo: { type: boolean }
+                    activo: { type: boolean }
+
+  /catalogos/estados-ejecucion:
+    get:
+      summary: Listar los estados de ejecución del pipeline (RF-AR-009, enmienda v1.1)
+      operationId: listarEstadosEjecucion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    codigo: { type: string }
+                    etiqueta: { type: string }
+                    es_estado_final: { type: boolean }
+                    activo: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    EjecucionPipeline:
+      type: object
+      properties:
+        id: { type: integer }
+        dag_run_id: { type: string }
+        estado: { type: string }
+        fecha_inicio: { type: string, format: date-time }
+        fecha_fin: { type: string, format: date-time, nullable: true }
+        sucursales_procesadas: { type: integer }
+        filas_cargadas: { type: integer }
+    VersionModeloML:
+      type: object
+      properties:
+        id: { type: integer }
+        modelo: { type: string }
+        version: { type: string }
+        estado: { type: string }
+        tamano_muestra: { type: integer }
+        periodo_inicio: { type: string, format: date }
+        periodo_fin: { type: string, format: date }
+        nombre_metrica: { type: string }
+        valor_metrica: { type: number, nullable: true }
+        motivo: { type: string, nullable: true }
+    PreguntaAsistente:
+      type: object
+      properties:
+        id: { type: integer }
+        pregunta_texto: { type: string }
+        consulta_generada: { type: string }
+        respuesta_texto: { type: string }
+        fecha: { type: string, format: date-time }
+    MargenPorSucursal:
+      type: object
+      description: 'enmienda v1.2 — fila agregada de ClickHouse, no un registro de PostgreSQL'
+      properties:
+        sucursal_id: { type: integer }
+        sucursal_nombre: { type: string }
+        margen_total: { type: number }
+        ingresos_total: { type: number }
+        lineas_de_venta: { type: integer }
+    MermaPorSucursal:
+      type: object
+      description: 'enmienda v1.2 — fila agregada de ClickHouse, no un registro de PostgreSQL'
+      properties:
+        sucursal_id: { type: integer }
+        sucursal_nombre: { type: string }
+        valor_perdido_total: { type: number }
+        cantidad_total: { type: number }
+        eventos: { type: integer }
+    TicketPromedioPorSucursal:
+      type: object
+      description: 'enmienda v1.2 — fila agregada de ClickHouse, no un registro de PostgreSQL'
+      properties:
+        sucursal_id: { type: integer }
+        sucursal_nombre: { type: string }
+        ticket_promedio: { type: number }
+        numero_ventas: { type: integer }
