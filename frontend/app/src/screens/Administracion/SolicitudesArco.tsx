@@ -5,6 +5,9 @@ import { Boton } from '@/components/ui/Boton'
 import { EsqueletoCarga } from '@/components/ui/EsqueletoCarga'
 import { EstadoVacio } from '@/components/ui/EstadoVacio'
 import { MensajeError } from '@/components/ui/MensajeError'
+import { BarraBusqueda } from '@/components/ui/BarraBusqueda'
+import { Paginacion } from '@/components/ui/Paginacion'
+import { usePaginacion } from '@/components/ui/usePaginacion'
 import {
   buscarClientes,
   crearSolicitudArco,
@@ -63,10 +66,10 @@ function FilaSolicitud({ solicitud, estados, tiposMap, estadosMap, onResuelta }:
   }
 
   return (
-    <li className="rounded-[var(--radius-card)] bg-surface-card p-4 shadow-[var(--shadow-elevation-1)]">
+    <li className="rounded-2xl border-2 border-amber-200/90 bg-white p-5 shadow-2xs hover:border-amber-300/90 transition-all">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-body font-medium text-text-primary">
+          <p className="text-body font-semibold text-brand-deep">
             Solicitud #{solicitud.id} · Cliente #{solicitud.cliente_id} · {nombreDe(tiposMap, solicitud.tipo)}
           </p>
           <p className="mt-1 text-body-sm text-text-secondary">{solicitud.detalle}</p>
@@ -76,7 +79,7 @@ function FilaSolicitud({ solicitud, estados, tiposMap, estadosMap, onResuelta }:
           {yaResuelta && (
             <p className="mt-1 text-body-sm text-text-secondary">
               Resuelta el {new Date(solicitud.fecha_resolucion as string).toLocaleString('es-EC')} por usuario #
-              {solicitud.atendida_por}: <span className="text-text-primary">{solicitud.respuesta}</span>
+              {solicitud.atendida_por}: <span className="text-text-primary font-medium">{solicitud.respuesta}</span>
             </p>
           )}
         </div>
@@ -87,7 +90,7 @@ function FilaSolicitud({ solicitud, estados, tiposMap, estadosMap, onResuelta }:
       </div>
 
       {!yaResuelta && (
-        <div className="mt-3 border-t border-surface-bg pt-3">
+        <div className="mt-3 border-t border-amber-200/60 pt-3">
           {!resolviendo ? (
             <Boton variante="secundario" type="button" onClick={() => setResolviendo(true)}>
               Resolver solicitud
@@ -97,7 +100,7 @@ function FilaSolicitud({ solicitud, estados, tiposMap, estadosMap, onResuelta }:
               <select
                 value={estadoElegido}
                 onChange={(evento) => setEstadoElegido(evento.target.value)}
-                className="rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+                className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
               >
                 {estadosFinales.map((estado) => (
                   <option key={estado.codigo} value={estado.codigo}>
@@ -108,16 +111,16 @@ function FilaSolicitud({ solicitud, estados, tiposMap, estadosMap, onResuelta }:
               <textarea
                 value={respuesta}
                 onChange={(evento) => setRespuesta(evento.target.value)}
-                placeholder="Respuesta para el cliente (obligatoria, Art. 10.3)"
+                placeholder="Respuesta para el cliente (obligatoria)"
                 required
                 rows={2}
-                className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+                className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
               />
               <div className="flex gap-2">
                 <Boton type="submit" disabled={guardando}>
                   {guardando ? 'Guardando…' : 'Confirmar resolución'}
                 </Boton>
-                <Boton variante="ghost" type="button" onClick={() => setResolviendo(false)}>
+                <Boton variante="secundario" type="button" onClick={() => setResolviendo(false)}>
                   Cancelar
                 </Boton>
               </div>
@@ -219,22 +222,47 @@ export function SolicitudesArco() {
   const tiposMap = tipos ? new Map(tipos.map((t) => [t.codigo, t.etiqueta])) : undefined
   const estadosMap = estados ? new Map(estados.map((e) => [e.codigo, e.etiqueta])) : undefined
 
+  const [busqueda, setBusqueda] = useState('')
+
+  const solicitudesList = solicitudes ?? []
+  const solicitudesFiltradas = solicitudesList.filter((s) => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      s.detalle.toLowerCase().includes(q) ||
+      String(s.id).includes(q) ||
+      String(s.cliente_id).includes(q) ||
+      s.tipo.toLowerCase().includes(q) ||
+      s.estado.toLowerCase().includes(q)
+    )
+  })
+
+  const {
+    datosPaginados: solicitudesPaginadas,
+    paginaActual,
+    totalPaginas,
+    itemsPorPagina,
+    totalItems,
+    cambiarPagina,
+    cambiarItemsPorPagina,
+  } = usePaginacion(solicitudesFiltradas, { itemsPorPaginaInicial: 8 })
+
   if (errorCatalogos) return <MensajeError mensaje={errorCatalogos} />
   if (!tipos || !estados) return <EsqueletoCarga filas={4} />
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[var(--radius-card)] bg-surface-card p-4 shadow-[var(--shadow-elevation-1)]">
-        <p className="mb-3 text-title text-text-primary">Registrar solicitud ARCO</p>
+      <div className="rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-2xs space-y-4">
+        <p className="text-title text-brand-deep font-bold">Registrar solicitud ARCO</p>
         <form onSubmit={manejarCrear} className="space-y-3">
           <div>
-            <label htmlFor="arco-cliente" className="mb-1 block text-label uppercase text-text-secondary">
+            <label htmlFor="arco-cliente" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
               Cliente
             </label>
             {clienteElegido ? (
               <p className="text-body text-text-primary">
                 {clienteElegido.nombre}{' '}
-                <button type="button" className="text-body-sm text-brand-primary-text underline" onClick={() => setClienteElegido(null)}>
+                <button type="button" className="text-body-sm text-brand-primary-text underline font-medium" onClick={() => setClienteElegido(null)}>
                   Cambiar
                 </button>
               </p>
@@ -245,10 +273,10 @@ export function SolicitudesArco() {
                   value={clienteTexto}
                   onChange={(evento) => setClienteTexto(evento.target.value)}
                   placeholder="Buscar cliente por nombre o contacto…"
-                  className="w-full max-w-md rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+                  className="w-full max-w-md rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
                 />
                 {resultadosCliente !== null && resultadosCliente.length > 0 && (
-                  <ul className="mt-1 max-w-md space-y-1 rounded-[var(--radius-card)] bg-surface-bg p-2">
+                  <ul className="mt-1 max-w-md space-y-1 rounded-xl border-2 border-amber-200/90 bg-amber-50/40 p-2">
                     {resultadosCliente.map((cliente) => (
                       <li key={cliente.id}>
                         <button
@@ -257,7 +285,7 @@ export function SolicitudesArco() {
                             setClienteElegido(cliente)
                             setResultadosCliente(null)
                           }}
-                          className="w-full rounded-[var(--radius-card)] p-2 text-left text-body hover:bg-brand-primary-soft"
+                          className="w-full rounded-lg p-2 text-left text-body hover:bg-amber-100/60"
                         >
                           {cliente.nombre}
                         </button>
@@ -269,14 +297,14 @@ export function SolicitudesArco() {
             )}
           </div>
           <div>
-            <label htmlFor="arco-tipo" className="mb-1 block text-label uppercase text-text-secondary">
+            <label htmlFor="arco-tipo" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
               Tipo de derecho
             </label>
             <select
               id="arco-tipo"
               value={tipoNuevo}
               onChange={(evento) => setTipoNuevo(evento.target.value)}
-              className="rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             >
               {tipos.map((tipo) => (
                 <option key={tipo.codigo} value={tipo.codigo}>
@@ -286,7 +314,7 @@ export function SolicitudesArco() {
             </select>
           </div>
           <div>
-            <label htmlFor="arco-detalle" className="mb-1 block text-label uppercase text-text-secondary">
+            <label htmlFor="arco-detalle" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
               Detalle
             </label>
             <textarea
@@ -295,7 +323,7 @@ export function SolicitudesArco() {
               onChange={(evento) => setDetalleNuevo(evento.target.value)}
               required
               rows={2}
-              className="w-full max-w-md rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full max-w-md rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
           <Boton type="submit" disabled={creando || !clienteElegido}>
@@ -305,29 +333,39 @@ export function SolicitudesArco() {
         {errorCreacion && <MensajeError mensaje={errorCreacion} />}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label htmlFor="filtro-estado-arco" className="mb-1 block text-label uppercase text-text-secondary">
-            Estado
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="filtro-estado-arco" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
+              Estado
+            </label>
+            <select
+              id="filtro-estado-arco"
+              value={filtroEstado}
+              onChange={(evento) => setFiltroEstado(evento.target.value)}
+              className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
+            >
+              <option value="">Todos los estados</option>
+              {estados.map((estado) => (
+                <option key={estado.codigo} value={estado.codigo}>
+                  {estado.etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-body">
+            <input type="checkbox" checked={soloVencidas} onChange={(evento) => setSoloVencidas(evento.target.checked)} />
+            Solo vencidas
           </label>
-          <select
-            id="filtro-estado-arco"
-            value={filtroEstado}
-            onChange={(evento) => setFiltroEstado(evento.target.value)}
-            className="rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
-          >
-            <option value="">Todos los estados</option>
-            {estados.map((estado) => (
-              <option key={estado.codigo} value={estado.codigo}>
-                {estado.etiqueta}
-              </option>
-            ))}
-          </select>
         </div>
-        <label className="flex items-center gap-2 text-body">
-          <input type="checkbox" checked={soloVencidas} onChange={(evento) => setSoloVencidas(evento.target.checked)} />
-          Solo vencidas (RF-AD-013)
-        </label>
+
+        <BarraBusqueda
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar por detalle o ID..."
+          totalCoincidencias={busqueda.trim() ? solicitudesFiltradas.length : undefined}
+          className="w-full sm:w-64"
+        />
       </div>
 
       {cargando && <EsqueletoCarga filas={3} alturaPx={100} />}
@@ -335,19 +373,36 @@ export function SolicitudesArco() {
       {!cargando && !error && solicitudes !== null && solicitudes.length === 0 && (
         <EstadoVacio titulo="Sin solicitudes" descripcion="No hay solicitudes ARCO que coincidan con este filtro." />
       )}
-      {!cargando && !error && solicitudes !== null && solicitudes.length > 0 && (
-        <ul className="space-y-3">
-          {solicitudes.map((solicitud) => (
-            <FilaSolicitud
-              key={solicitud.id}
-              solicitud={solicitud}
-              estados={estados}
-              tiposMap={tiposMap}
-              estadosMap={estadosMap}
-              onResuelta={actualizarSolicitudEnLista}
-            />
-          ))}
-        </ul>
+      {!cargando && !error && solicitudes !== null && solicitudes.length > 0 && solicitudesFiltradas.length === 0 && (
+        <EstadoVacio
+          titulo="Sin coincidencias"
+          descripcion={`No se encontraron solicitudes que coincidan con "${busqueda}".`}
+        />
+      )}
+      {!cargando && !error && solicitudes !== null && solicitudesFiltradas.length > 0 && (
+        <div className="space-y-4">
+          <ul className="space-y-3">
+            {solicitudesPaginadas.map((solicitud) => (
+              <FilaSolicitud
+                key={solicitud.id}
+                solicitud={solicitud}
+                estados={estados}
+                tiposMap={tiposMap}
+                estadosMap={estadosMap}
+                onResuelta={actualizarSolicitudEnLista}
+              />
+            ))}
+          </ul>
+          <Paginacion
+            paginaActual={paginaActual}
+            totalPaginas={totalPaginas}
+            totalItems={totalItems}
+            itemsPorPagina={itemsPorPagina}
+            onCambiarPagina={cambiarPagina}
+            onCambiarItemsPorPagina={cambiarItemsPorPagina}
+            etiquetaItems="solicitudes"
+          />
+        </div>
       )}
     </div>
   )

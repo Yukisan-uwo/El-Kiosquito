@@ -378,6 +378,27 @@ def anular_venta(
     return venta
 
 
+@router.get("/ventas", response_model=list[VentaOut], tags=["ventas"])
+def listar_ventas(
+    turno_caja_id: int | None = Query(None, description="Filtrar ventas por turno de caja"),
+    sucursal_id: int | None = Query(None, description="Filtrar ventas por sucursal"),
+    limite: int = Query(20, ge=1, le=100, description="Cantidad máxima de ventas"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_permission("venta", "leer")),
+) -> list[Venta]:
+    """Consulta las últimas ventas del turno o sucursal para el panel del POS y control de caja."""
+    query = db.query(Venta)
+    if turno_caja_id is not None:
+        turno = db.get(TurnoCaja, turno_caja_id)
+        if turno is not None:
+            verificar_alcance_sucursal(db, current_user, turno.sucursal_id)
+        query = query.filter(Venta.turno_caja_id == turno_caja_id)
+    elif sucursal_id is not None:
+        verificar_alcance_sucursal(db, current_user, sucursal_id)
+        query = query.filter(Venta.sucursal_id == sucursal_id)
+    return query.order_by(Venta.hora_inicio_cobro.desc()).limit(limite).all()
+
+
 # ---------------------------------------------------------------------------
 # Productos (RF-CVI-006, 007, 023, 025)
 # ---------------------------------------------------------------------------
@@ -426,6 +447,10 @@ def buscar_productos(
     productos = query.order_by(Producto.nombre).all()
 
     nombres_categoria = {c.id: c.nombre for c in db.query(Categoria).all()}
+    stock_rows = {
+        s.producto_id: s
+        for s in db.query(StockSucursal).filter(StockSucursal.sucursal_id == sucursal_id).all()
+    }
 
     resultado: list[ProductoBusquedaOut] = []
     for producto in productos:
@@ -438,6 +463,7 @@ def buscar_productos(
             .order_by(HistorialPrecioProducto.vigente_desde.desc())
             .first()
         )
+        stock_item = stock_rows.get(producto.id)
         resultado.append(
             ProductoBusquedaOut(
                 id=producto.id,
@@ -449,6 +475,8 @@ def buscar_productos(
                 es_fraccionable=producto.es_fraccionable,
                 activo=producto.activo,
                 precio_venta_vigente=_money(precio_row.precio_venta) if precio_row else None,
+                stock_actual=stock_item.cantidad_disponible if stock_item else None,
+                stock_minimo=stock_item.stock_minimo if stock_item else None,
             )
         )
     return resultado

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { apiFetch, ApiError, registrarManejadorNoAutorizado, registrarTokenProvider } from '@/api/client'
 import { decodificarClaims, tokenVencido, type ClaimsJwt } from './jwt'
 import { esCodigoRolConocido, type CodigoRol } from './roles'
@@ -28,38 +28,76 @@ function construirSesion(token: string): SesionUsuario {
   return { token, claims, rol: claims.rol }
 }
 
+function recuperarTokenDeStorage(): string | null {
+  try {
+    const token = localStorage.getItem(CLAVE_STORAGE) || sessionStorage.getItem(CLAVE_STORAGE)
+    if (token && !localStorage.getItem(CLAVE_STORAGE)) {
+      localStorage.setItem(CLAVE_STORAGE, token)
+    }
+    return token
+  } catch {
+    return null
+  }
+}
+
+function limpiarTokenDeStorage(): void {
+  try {
+    localStorage.removeItem(CLAVE_STORAGE)
+    sessionStorage.removeItem(CLAVE_STORAGE)
+  } catch {
+    // Ignorar si el storage no está accesible
+  }
+}
+
+function guardarTokenEnStorage(token: string): void {
+  try {
+    localStorage.setItem(CLAVE_STORAGE, token)
+    sessionStorage.setItem(CLAVE_STORAGE, token)
+  } catch {
+    // Ignorar si el storage no está accesible
+  }
+}
+
+function recuperarSesionGuardada(): SesionUsuario | null {
+  const tokenGuardado = recuperarTokenDeStorage()
+  if (!tokenGuardado) return null
+  try {
+    const sesionRestaurada = construirSesion(tokenGuardado)
+    if (!tokenVencido(sesionRestaurada.claims)) {
+      return sesionRestaurada
+    }
+    limpiarTokenDeStorage()
+    return null
+  } catch {
+    limpiarTokenDeStorage()
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [sesion, setSesion] = useState<SesionUsuario | null>(null)
-  const [cargandoSesionInicial, setCargandoSesionInicial] = useState(true)
+  // Restaura la sesión sincrónicamente al recargar la página:
+  // Como el JWT dura 8 horas (ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8 en el backend),
+  // el usuario no debe ser deslogueado al refrescar la pantalla.
+  // La inicialización sincrónica previene la condición de carrera donde los
+  // componentes hijos montados en la ruta protegida lanzaban peticiones a la API
+  // antes de que el efecto restaurara el token, recibiendo 401 y provocando un logout no deseado.
+  const [sesion, setSesion] = useState<SesionUsuario | null>(() => recuperarSesionGuardada())
+  const [cargandoSesionInicial] = useState(false)
+
+  const sesionRef = useRef<SesionUsuario | null>(sesion)
+  sesionRef.current = sesion
+
+  // Garantizar que el cliente API tenga acceso al token de inmediato
+  registrarTokenProvider(() => sesionRef.current?.token ?? recuperarTokenDeStorage())
 
   const cerrarSesion = useCallback(() => {
-    sessionStorage.removeItem(CLAVE_STORAGE)
+    limpiarTokenDeStorage()
+    sesionRef.current = null
     setSesion(null)
   }, [])
 
-  // Restaura la sesión al recargar la página (sessionStorage: dura el
-  // turno/pestaña, nunca sobrevive a cerrar el navegador — mismo criterio
-  // que la cinemática de login, RN de UX, no de seguridad: la seguridad
-  // real la sigue validando el backend en cada request).
   useEffect(() => {
-    const tokenGuardado = sessionStorage.getItem(CLAVE_STORAGE)
-    if (tokenGuardado) {
-      try {
-        const nuevaSesion = construirSesion(tokenGuardado)
-        if (!tokenVencido(nuevaSesion.claims)) {
-          setSesion(nuevaSesion)
-        } else {
-          sessionStorage.removeItem(CLAVE_STORAGE)
-        }
-      } catch {
-        sessionStorage.removeItem(CLAVE_STORAGE)
-      }
-    }
-    setCargandoSesionInicial(false)
-  }, [])
-
-  useEffect(() => {
-    registrarTokenProvider(() => sesion?.token ?? null)
+    registrarTokenProvider(() => sesionRef.current?.token ?? recuperarTokenDeStorage())
   }, [sesion])
 
   useEffect(() => {
@@ -73,7 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sinAuth: true,
     })
     const nuevaSesion = construirSesion(respuesta.access_token)
-    sessionStorage.setItem(CLAVE_STORAGE, respuesta.access_token)
+    guardarTokenEnStorage(respuesta.access_token)
+    sesionRef.current = nuevaSesion
     setSesion(nuevaSesion)
   }, [])
 

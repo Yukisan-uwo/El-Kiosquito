@@ -11,8 +11,39 @@ servers:
 
 paths:
   /clientes:
+    get:
+      summary: Buscar o listar clientes (RF-CF-013, enmienda v1.4)
+      description: >
+        Búsqueda de clientes para atención en punto de venta y administración.
+        Si se omite el parámetro `q` o está vacío, devuelve la lista inicial de clientes registrados (hasta 50).
+      security:
+        - bearerAuth: [cajero, fidelizacion, encargado_sucursal, gerencia]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filtro parcial por nombre o datos de contacto (opcional)
+        - name: limite
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Límite máximo de resultados a devolver
+      responses:
+        '200':
+          description: Lista de clientes coincidentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cliente'
+
     post:
-      summary: Registrar cliente (RF-CF-001)
+      summary: Registrar cliente (RF-CF-001, RF-CF-012)
       security:
         - bearerAuth: [fidelizacion, encargado_sucursal, gerencia]
       requestBody:

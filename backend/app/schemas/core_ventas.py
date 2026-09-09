@@ -54,6 +54,7 @@ class VentaOut(BaseModel):
     metodo_pago: str
     estado_venta: str
     datafono_id: int | None = None
+    hora_inicio_cobro: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +118,8 @@ class ProductoBusquedaOut(BaseModel):
     es_fraccionable: bool
     activo: bool
     precio_venta_vigente: Decimal | None = None
+    stock_actual: Decimal | None = None
+    stock_minimo: Decimal | None = None
 
 
 # ---------------------------------------------------------------------------

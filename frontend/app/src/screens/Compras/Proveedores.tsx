@@ -2,9 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '@/api/client'
 import { BadgeEstado } from '@/components/ui/BadgeEstado'
 import { Boton } from '@/components/ui/Boton'
+import { CardKpi } from '@/components/ui/CardKpi'
 import { EsqueletoCarga } from '@/components/ui/EsqueletoCarga'
 import { EstadoVacio } from '@/components/ui/EstadoVacio'
 import { MensajeError } from '@/components/ui/MensajeError'
+import { BarraBusqueda } from '@/components/ui/BarraBusqueda'
+import { Paginacion } from '@/components/ui/Paginacion'
+import { usePaginacion } from '@/components/ui/usePaginacion'
 import { actualizarProveedor, crearProveedor, desactivarProveedor, listarProveedores } from './api'
 import type { Proveedor } from './tipos'
 
@@ -37,6 +41,7 @@ export function Proveedores() {
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null)
 
   const [desactivandoId, setDesactivandoId] = useState<number | null>(null)
+  const [busqueda, setBusqueda] = useState('')
 
   const cargar = useCallback(() => {
     setCargando(true)
@@ -101,13 +106,43 @@ export function Proveedores() {
     }
   }
 
+  const proveedoresList = proveedores ?? []
+  const proveedoresFiltrados = proveedoresList.filter((proveedor) => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      proveedor.nombre.toLowerCase().includes(q) ||
+      (proveedor.contacto ?? '').toLowerCase().includes(q)
+    )
+  })
+
+  const {
+    datosPaginados: proveedoresPaginados,
+    paginaActual,
+    totalPaginas,
+    itemsPorPagina,
+    totalItems,
+    cambiarPagina,
+    cambiarItemsPorPagina,
+  } = usePaginacion(proveedoresFiltrados, { itemsPorPaginaInicial: 10 })
+
+  const totalProveedores = proveedoresList.length
+  const activosCount = proveedoresList.filter((p) => p.activo).length
+  const inactivosCount = totalProveedores - activosCount
+
   return (
     <div className="space-y-6">
-      <form onSubmit={manejarCrear} className="space-y-3 rounded-[var(--radius-card)] bg-surface-card p-4">
-        <p className="text-title text-text-primary">Registrar proveedor</p>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1">
-            <label htmlFor="proveedor-nombre" className="mb-1 block text-label uppercase text-text-secondary">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CardKpi etiqueta="Total proveedores" cifra={`${totalProveedores} registrado${totalProveedores === 1 ? '' : 's'}`} />
+        <CardKpi etiqueta="Proveedores activos" cifra={`${activosCount} activo${activosCount === 1 ? '' : 's'}`} />
+        <CardKpi etiqueta="Inactivos / deshabilitados" cifra={`${inactivosCount} inactivo${inactivosCount === 1 ? '' : 's'}`} />
+      </div>
+
+      <form onSubmit={manejarCrear} className="space-y-4 rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-2xs">
+        <p className="text-title font-bold text-brand-deep">Registrar proveedor</p>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex-1 min-w-[240px]">
+            <label htmlFor="proveedor-nombre" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
               Nombre
             </label>
             <input
@@ -116,11 +151,11 @@ export function Proveedores() {
               required
               value={nombreNuevo}
               onChange={(evento) => setNombreNuevo(evento.target.value)}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
-          <div className="flex-1">
-            <label htmlFor="proveedor-contacto" className="mb-1 block text-label uppercase text-text-secondary">
+          <div className="flex-1 min-w-[240px]">
+            <label htmlFor="proveedor-contacto" className="mb-1 block text-label uppercase text-text-secondary font-semibold">
               Contacto (opcional)
             </label>
             <input
@@ -128,7 +163,7 @@ export function Proveedores() {
               type="text"
               value={contactoNuevo}
               onChange={(evento) => setContactoNuevo(evento.target.value)}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
         </div>
@@ -138,29 +173,42 @@ export function Proveedores() {
         </Boton>
       </form>
 
-      <div className="flex items-center justify-between">
-        <p className="text-title text-text-primary">Proveedores</p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setFiltro('activos')}
-            aria-pressed={filtro === 'activos'}
-            className={`rounded-[var(--radius-card)] px-3 py-1.5 text-body-sm ${
-              filtro === 'activos' ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
-            }`}
-          >
-            Activos
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltro('todos')}
-            aria-pressed={filtro === 'todos'}
-            className={`rounded-[var(--radius-card)] px-3 py-1.5 text-body-sm ${
-              filtro === 'todos' ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
-            }`}
-          >
-            Todos
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-title font-bold text-brand-deep">Proveedores</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <BarraBusqueda
+            valor={busqueda}
+            onChange={setBusqueda}
+            placeholder="Buscar por nombre o contacto..."
+            totalCoincidencias={busqueda.trim() ? proveedoresFiltrados.length : undefined}
+            className="w-full sm:w-64"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltro('activos')}
+              aria-pressed={filtro === 'activos'}
+              className={`rounded-xl px-4 py-1.5 text-body-sm font-semibold transition-colors ${
+                filtro === 'activos'
+                  ? 'bg-brand-primary text-white shadow-2xs'
+                  : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:bg-amber-50'
+              }`}
+            >
+              Activos
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltro('todos')}
+              aria-pressed={filtro === 'todos'}
+              className={`rounded-xl px-4 py-1.5 text-body-sm font-semibold transition-colors ${
+                filtro === 'todos'
+                  ? 'bg-brand-primary text-white shadow-2xs'
+                  : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:bg-amber-50'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
       </div>
 
@@ -172,61 +220,83 @@ export function Proveedores() {
           descripcion="Registrá el primero con el formulario de arriba."
         />
       )}
-      {!cargando && !error && proveedores !== null && proveedores.length > 0 && (
-        <ul className="space-y-2">
-          {proveedores.map((proveedor) => (
-            <li key={proveedor.id} className="rounded-[var(--radius-card)] bg-surface-card p-4 shadow-[var(--shadow-elevation-1)]">
-              {idEditando === proveedor.id ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      value={nombreEdicion}
-                      onChange={(evento) => setNombreEdicion(evento.target.value)}
-                      className="flex-1 rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
-                    />
-                    <input
-                      value={contactoEdicion}
-                      onChange={(evento) => setContactoEdicion(evento.target.value)}
-                      placeholder="Contacto"
-                      className="flex-1 rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
-                    />
-                  </div>
-                  {errorEdicion && <MensajeError mensaje={errorEdicion} />}
-                  <div className="flex gap-2">
-                    <Boton disabled={guardandoEdicion} onClick={() => guardarEdicion(proveedor.id)}>
-                      {guardandoEdicion ? 'Guardando…' : 'Guardar'}
-                    </Boton>
-                    <Boton variante="ghost" onClick={() => setIdEditando(null)}>
-                      Cancelar
-                    </Boton>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-body font-medium text-text-primary">{proveedor.nombre}</p>
-                    <p className="text-body-sm text-text-secondary">{proveedor.contacto ?? 'Sin contacto registrado'}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <BadgeEstado texto={proveedor.activo ? 'Activo' : 'Inactivo'} color={proveedor.activo ? 'success' : 'danger'} />
-                    <Boton variante="ghost" onClick={() => iniciarEdicion(proveedor)}>
-                      Editar
-                    </Boton>
-                    {proveedor.activo && (
-                      <Boton
-                        variante="peligro"
-                        disabled={desactivandoId === proveedor.id}
-                        onClick={() => manejarDesactivar(proveedor.id)}
-                      >
-                        {desactivandoId === proveedor.id ? 'Desactivando…' : 'Desactivar'}
+      {!cargando && !error && proveedores !== null && proveedores.length > 0 && proveedoresFiltrados.length === 0 && (
+        <EstadoVacio
+          titulo="Sin coincidencias"
+          descripcion={`No se encontraron proveedores que coincidan con "${busqueda}".`}
+        />
+      )}
+      {!cargando && !error && proveedores !== null && proveedoresFiltrados.length > 0 && (
+        <div className="space-y-4">
+          <ul className="space-y-3">
+            {proveedoresPaginados.map((proveedor) => (
+              <li
+                key={proveedor.id}
+                className="rounded-2xl border-2 border-amber-200/90 bg-white p-5 shadow-2xs hover:border-amber-300/90 transition-all"
+              >
+                {idEditando === proveedor.id ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-3">
+                      <input
+                        value={nombreEdicion}
+                        onChange={(evento) => setNombreEdicion(evento.target.value)}
+                        className="flex-1 min-w-[200px] rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
+                      />
+                      <input
+                        value={contactoEdicion}
+                        onChange={(evento) => setContactoEdicion(evento.target.value)}
+                        placeholder="Contacto"
+                        className="flex-1 min-w-[200px] rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
+                      />
+                    </div>
+                    {errorEdicion && <MensajeError mensaje={errorEdicion} />}
+                    <div className="flex gap-2">
+                      <Boton disabled={guardandoEdicion} onClick={() => guardarEdicion(proveedor.id)}>
+                        {guardandoEdicion ? 'Guardando…' : 'Guardar'}
                       </Boton>
-                    )}
+                      <Boton variante="ghost" onClick={() => setIdEditando(null)}>
+                        Cancelar
+                      </Boton>
+                    </div>
                   </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-body font-bold text-text-primary">{proveedor.nombre}</p>
+                      <p className="text-body-sm text-text-secondary">{proveedor.contacto ?? 'Sin contacto registrado'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <BadgeEstado texto={proveedor.activo ? 'Activo' : 'Inactivo'} color={proveedor.activo ? 'success' : 'danger'} />
+                      <Boton variante="ghost" onClick={() => iniciarEdicion(proveedor)}>
+                        Editar
+                      </Boton>
+                      {proveedor.activo && (
+                        <Boton
+                          variante="peligro"
+                          disabled={desactivandoId === proveedor.id}
+                          onClick={() => manejarDesactivar(proveedor.id)}
+                        >
+                          {desactivandoId === proveedor.id ? 'Desactivando…' : 'Desactivar'}
+                        </Boton>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div className="rounded-2xl border-2 border-amber-200/90 bg-white shadow-2xs">
+            <Paginacion
+              paginaActual={paginaActual}
+              totalPaginas={totalPaginas}
+              totalItems={totalItems}
+              itemsPorPagina={itemsPorPagina}
+              onCambiarPagina={cambiarPagina}
+              onCambiarItemsPorPagina={cambiarItemsPorPagina}
+              etiquetaItems="proveedores"
+            />
+          </div>
+        </div>
       )}
     </div>
   )

@@ -97,43 +97,23 @@ def consultar_politica_privacidad(
 
 @router.get("/clientes", response_model=list[ClienteOut], tags=["clientes"])
 def buscar_clientes(
-    q: str = Query(..., min_length=2, description="Búsqueda parcial e insensible a mayúsculas sobre nombre o contacto"),
+    q: str = Query("", description="Búsqueda parcial e insensible a mayúsculas sobre nombre o contacto. Si está vacío, devuelve la lista inicial."),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_permission("cliente", "leer")),
 ) -> list[Cliente]:
-    """RF-CF-013 (enmienda v1.3, 2026-09-06). Hueco real encontrado al
-    construir la pantalla de POS del cajero (`PosCajero.tsx`, Tarea #55):
-    hasta esta enmienda, 002 solo exponía `POST /clientes` (alta) y
-    consultas por `id` ya conocido (`historial-compras`, `segmento`,
-    `riesgo-abandono`) — ningún endpoint permitía volver a encontrar un
-    cliente ya registrado sin ya saber su id interno, así que el POS solo
-    podía ofrecer "sin cliente" o "cliente nuevo", nunca re-identificar a
-    alguien que ya estaba en el programa de fidelización (quedó documentado
-    como comentario en `ClienteVenta.tsx` en su momento, en vez de
-    resolverse de una — la Tarea #55 se acotó explícitamente a "alta de
-    cliente nuevo"). No hizo falta ninguna migración de RBAC: `cliente/leer`
-    ya estaba concedido a los cuatro roles (`cajero` incluido) desde 010 —
-    mismo criterio que RF-PS-013 (007) y RF-CMF-018 (006): antes de escribir
-    un endpoint nuevo, se verificó contra la matriz real si el permiso ya
-    alcanzaba.
-
-    `cliente` no tiene columna `sucursal_id` (es una entidad de cadena, no
-    de sucursal — un cliente puede comprar en cualquier local), así que este
-    endpoint nunca llama `verificar_alcance_sucursal`, igual que
-    `crear_cliente` y el resto de este router. `q` es obligatorio (mínimo 2
-    caracteres) a propósito, a diferencia de `GET /productos` de 001 (que
-    con `sucursal_id` y sin `q`/`codigo_barras` trae el catálogo completo):
-    devolver aquí la clientela entera del programa de fidelización sin
-    ningún criterio de búsqueda no tiene un caso de uso real en el POS y
-    choca con el principio de minimización de datos de la LOPDP (Art. 10) —
-    este endpoint es un buscador, nunca un listado completo. El resultado
-    se acota a 20 filas por la misma razón: es para que un cajero encuentre
-    a alguien mientras cobra, no para paginar toda la base de clientes."""
+    query = db.query(Cliente)
+    if q and q.strip():
+        termino = f"%{q.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Cliente.nombre).like(termino),
+                func.lower(Cliente.contacto).like(termino),
+            )
+        )
     return (
-        db.query(Cliente)
-        .filter(or_(func.lower(Cliente.nombre).contains(q.lower()), func.lower(Cliente.contacto).contains(q.lower())))
+        query
         .order_by(Cliente.nombre)
-        .limit(20)
+        .limit(50)
         .all()
     )
 

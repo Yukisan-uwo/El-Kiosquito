@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '@/api/client'
 import { BadgeEstado } from '@/components/ui/BadgeEstado'
+import { BarraBusqueda } from '@/components/ui/BarraBusqueda'
 import { Boton } from '@/components/ui/Boton'
+import { CardKpi } from '@/components/ui/CardKpi'
 import { EsqueletoCarga } from '@/components/ui/EsqueletoCarga'
 import { EstadoVacio } from '@/components/ui/EstadoVacio'
 import { MensajeError } from '@/components/ui/MensajeError'
+import { Paginacion } from '@/components/ui/Paginacion'
+import { usePaginacion } from '@/components/ui/usePaginacion'
 import {
   buscarProductos,
   consultarPronostico,
@@ -89,7 +93,10 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
   async function manejarRegistrarRecepcion(evento: React.FormEvent) {
     evento.preventDefault()
     const cantidad = Number(cantidadRecibida)
-    if (!(cantidad > 0)) return
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      setErrorRecepcion('Ingresá una cantidad recibida mayor a 0.')
+      return
+    }
     setEnviandoRecepcion(true)
     setErrorRecepcion(null)
     try {
@@ -114,13 +121,13 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
   }
 
   return (
-    <tr className="border-b border-surface-bg last:border-0 align-top">
-      <td className="px-3 py-2 text-text-primary">{nombreProducto}</td>
+    <tr className="border-b border-amber-100 last:border-0 align-top hover:bg-amber-50/40 transition-colors">
+      <td className="px-3 py-2 text-text-primary font-medium">{nombreProducto}</td>
       <td className="px-3 py-2 text-right">{Number(item.cantidad_pedida)}</td>
       <td className="px-3 py-2 text-right">
-        <span className={completa ? 'text-status-success' : 'text-status-warning'}>{Number(item.cantidad_recibida)}</span>
+        <span className={completa ? 'text-status-success font-semibold' : 'text-status-warning font-semibold'}>{Number(item.cantidad_recibida)}</span>
       </td>
-      <td className="px-3 py-2 text-right">{formatoMoneda(Number(item.precio_ofrecido))}</td>
+      <td className="px-3 py-2 text-right font-mono">{formatoMoneda(Number(item.precio_ofrecido))}</td>
       <td className="px-3 py-2 space-y-2">
         {orden.es_oferta && (
           <div className="space-y-1">
@@ -129,7 +136,7 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
                 texto={item.pronostico_consultado ? 'Pronóstico consultado' : 'Pronóstico sin consultar'}
                 color={item.pronostico_consultado ? 'success' : 'warning'}
               />
-              <Boton variante="ghost" type="button" disabled={consultandoPronostico} onClick={manejarConsultarPronostico}>
+              <Boton variante="secundario" type="button" disabled={consultandoPronostico} onClick={manejarConsultarPronostico} className="h-7 text-xs">
                 {consultandoPronostico ? 'Consultando…' : 'Consultar pronóstico'}
               </Boton>
             </div>
@@ -146,13 +153,14 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
                 value={motivo}
                 onChange={(evento) => setMotivo(evento.target.value)}
                 placeholder="Motivo si no siguió el pronóstico (mínimo 3 caracteres)"
-                className="w-56 rounded-[var(--radius-card)] border border-brand-primary-soft px-2 py-1 text-body-sm"
+                className="w-56 rounded-xl border-2 border-amber-200/90 bg-white px-2.5 py-1 text-body-sm focus:border-brand-primary"
               />
               <Boton
-                variante="ghost"
+                variante="secundario"
                 type="button"
                 disabled={guardandoMotivo || motivo.trim().length < 3}
                 onClick={manejarGuardarMotivo}
+                className="h-7 text-xs"
               >
                 {guardandoMotivo ? 'Guardando…' : 'Guardar motivo'}
               </Boton>
@@ -164,7 +172,7 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
         {permiteRecepcion && !completa && (
           <div>
             {!mostrarRecepcion ? (
-              <Boton variante="secundario" type="button" onClick={() => setMostrarRecepcion(true)}>
+              <Boton variante="secundario" type="button" onClick={() => setMostrarRecepcion(true)} className="h-8 text-xs">
                 Registrar recepción
               </Boton>
             ) : (
@@ -175,21 +183,22 @@ function FilaItem({ orden, item, nombreProducto, permiteRecepcion, onOrdenActual
                   step="0.001"
                   required
                   value={cantidadRecibida}
+                  onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault() }}
                   onChange={(evento) => setCantidadRecibida(evento.target.value)}
                   placeholder="Cantidad recibida"
-                  className="w-32 rounded-[var(--radius-card)] border border-brand-primary-soft px-2 py-1 text-body-sm"
+                  className="w-32 rounded-xl border-2 border-amber-200/90 bg-white px-2.5 py-1 text-body-sm focus:border-brand-primary"
                 />
                 <input
                   type="text"
                   value={numeroDocumento}
                   onChange={(evento) => setNumeroDocumento(evento.target.value)}
                   placeholder="N° factura/guía (opcional)"
-                  className="w-48 rounded-[var(--radius-card)] border border-brand-primary-soft px-2 py-1 text-body-sm"
+                  className="w-48 rounded-xl border-2 border-amber-200/90 bg-white px-2.5 py-1 text-body-sm focus:border-brand-primary"
                 />
-                <Boton type="submit" disabled={enviandoRecepcion}>
+                <Boton type="submit" disabled={enviandoRecepcion} className="h-7 text-xs">
                   {enviandoRecepcion ? 'Registrando…' : 'Confirmar'}
                 </Boton>
-                <Boton variante="ghost" type="button" onClick={() => setMostrarRecepcion(false)}>
+                <Boton variante="secundario" type="button" onClick={() => setMostrarRecepcion(false)} className="h-7 text-xs">
                   Cancelar
                 </Boton>
               </form>
@@ -285,52 +294,100 @@ export function Ordenes({ ordenParaResaltar }: OrdenesProps) {
     setOrdenes((actual) => actual?.map((orden) => (orden.id === ordenActualizada.id ? ordenActualizada : orden)) ?? actual)
   }
 
+  const [busqueda, setBusqueda] = useState('')
+
   const proveedoresMap = proveedores ? new Map(proveedores.map((p) => [p.id, p.nombre])) : undefined
   const sucursalesMap = sucursales ? new Map(sucursales.map((s) => [s.id, s.nombre])) : undefined
   const estadosMap = estadosCatalogo ? new Map(estadosCatalogo.map((e) => [e.codigo, e])) : undefined
+
+  const totalOrdenes = ordenes?.length ?? 0
+  const ordenesPendientes = ordenes?.filter((o) => o.estado === 'pendiente' || o.estado === 'recibida_parcial').length ?? 0
+  const ordenesCompletas = ordenes?.filter((o) => o.estado === 'recibida_completa').length ?? 0
+  const ordenesOferta = ordenes?.filter((o) => o.es_oferta).length ?? 0
+
+  const ordenesFiltradas = (ordenes ?? []).filter((orden) => {
+    if (!busqueda.trim()) return true
+    const proveedor = nombreDe(proveedoresMap, orden.proveedor_id, 'Proveedor').toLowerCase()
+    const numOrden = String(orden.id)
+    const sucursal = nombreDe(sucursalesMap, orden.sucursal_id, 'Sucursal').toLowerCase()
+    const q = busqueda.toLowerCase()
+    return proveedor.includes(q) || numOrden.includes(q) || sucursal.includes(q)
+  })
+
+  const {
+    datosPaginados: ordenesPaginadas,
+    paginaActual,
+    totalPaginas,
+    itemsPorPagina,
+    totalItems,
+    cambiarPagina,
+    cambiarItemsPorPagina,
+  } = usePaginacion(ordenesFiltradas, { itemsPorPaginaInicial: 5 })
 
   if (errorCatalogos) return <MensajeError mensaje={errorCatalogos} />
   if (!sucursales || !proveedores || !estadosCatalogo) return <EsqueletoCarga filas={4} />
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label htmlFor="filtro-sucursal" className="mb-1 block text-label uppercase text-text-secondary">
-            Sucursal
-          </label>
-          <select
-            id="filtro-sucursal"
-            value={filtroSucursal ?? ''}
-            onChange={(evento) => setFiltroSucursal(evento.target.value ? Number(evento.target.value) : null)}
-            className="rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
-          >
-            <option value="">Toda la cadena</option>
-            {sucursales.map((sucursal) => (
-              <option key={sucursal.id} value={sucursal.id}>
-                {sucursal.nombre}
-              </option>
-            ))}
-          </select>
+    <div className="space-y-5">
+      {/* Resumen de órdenes */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <CardKpi etiqueta="Total órdenes" cifra={`${totalOrdenes} orden${totalOrdenes === 1 ? '' : 'es'}`} />
+        <CardKpi
+          etiqueta="Pendientes de recepción"
+          cifra={`${ordenesPendientes} pendiente${ordenesPendientes === 1 ? '' : 's'}`}
+          comparacion={ordenesPendientes > 0 ? { texto: 'Requieren ingreso', favorable: false } : undefined}
+        />
+        <CardKpi etiqueta="Recibidas completas" cifra={`${ordenesCompletas} completa${ordenesCompletas === 1 ? '' : 's'}`} />
+        <CardKpi etiqueta="Compras por oferta" cifra={`${ordenesOferta} en oferta`} />
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="filtro-sucursal" className="mb-1 block text-label uppercase text-text-secondary">
+              Sucursal
+            </label>
+            <select
+              id="filtro-sucursal"
+              value={filtroSucursal ?? ''}
+              onChange={(evento) => setFiltroSucursal(evento.target.value ? Number(evento.target.value) : null)}
+              className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
+            >
+              <option value="">Toda la cadena</option>
+              {sucursales.map((sucursal) => (
+                <option key={sucursal.id} value={sucursal.id}>
+                  {sucursal.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="filtro-estado" className="mb-1 block text-label uppercase text-text-secondary">
+              Estado
+            </label>
+            <select
+              id="filtro-estado"
+              value={filtroEstado}
+              onChange={(evento) => setFiltroEstado(evento.target.value)}
+              className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
+            >
+              <option value="">Todos los estados</option>
+              {estadosCatalogo.map((estado) => (
+                <option key={estado.codigo} value={estado.codigo}>
+                  {estado.etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label htmlFor="filtro-estado" className="mb-1 block text-label uppercase text-text-secondary">
-            Estado
-          </label>
-          <select
-            id="filtro-estado"
-            value={filtroEstado}
-            onChange={(evento) => setFiltroEstado(evento.target.value)}
-            className="rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
-          >
-            <option value="">Todos los estados</option>
-            {estadosCatalogo.map((estado) => (
-              <option key={estado.codigo} value={estado.codigo}>
-                {estado.etiqueta}
-              </option>
-            ))}
-          </select>
-        </div>
+
+        <BarraBusqueda
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar por proveedor, ID..."
+          totalCoincidencias={ordenesFiltradas.length}
+          className="max-w-xs"
+        />
       </div>
 
       {cargando && <EsqueletoCarga filas={3} alturaPx={140} />}
@@ -342,59 +399,79 @@ export function Ordenes({ ordenParaResaltar }: OrdenesProps) {
         />
       )}
       {!cargando && !error && ordenes !== null && ordenes.length > 0 && (
-        <ul className="space-y-4">
-          {ordenes.map((orden) => {
-            const estadoInfo = estadosMap?.get(orden.estado)
-            const catalogoProductos = catalogosPorSucursal[orden.sucursal_id]
-            return (
-              <li
-                key={orden.id}
-                className={`rounded-[var(--radius-card)] bg-surface-card p-4 shadow-[var(--shadow-elevation-1)] ${
-                  ordenParaResaltar === orden.id ? 'ring-2 ring-brand-primary' : ''
-                }`}
-              >
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-body font-medium text-text-primary">
-                      Orden #{orden.id} · {nombreDe(proveedoresMap, orden.proveedor_id, 'Proveedor')}
-                    </p>
-                    <p className="text-body-sm text-text-secondary">
-                      {nombreDe(sucursalesMap, orden.sucursal_id, 'Sucursal')} · {new Date(orden.fecha_pedido).toLocaleDateString('es-EC')} ·{' '}
-                      {orden.forma_pago}
-                      {orden.es_oferta ? ' · Compra por oferta' : ''}
-                    </p>
-                  </div>
-                  <BadgeEstado texto={estadoInfo?.etiqueta ?? orden.estado} color={COLOR_POR_ESTADO[orden.estado] ?? 'info'} />
-                </div>
-                <div className="overflow-x-auto rounded-[var(--radius-card)] bg-surface-bg">
-                  <table className="w-full text-body">
-                    <thead>
-                      <tr className="border-b border-surface-card text-left text-label uppercase text-text-secondary">
-                        <th scope="col" className="px-3 py-2">Producto</th>
-                        <th scope="col" className="px-3 py-2 text-right">Pedido</th>
-                        <th scope="col" className="px-3 py-2 text-right">Recibido</th>
-                        <th scope="col" className="px-3 py-2 text-right">Precio</th>
-                        <th scope="col" className="px-3 py-2">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orden.items.map((item) => (
-                        <FilaItem
-                          key={item.id}
-                          orden={orden}
-                          item={item}
-                          nombreProducto={nombreDe(catalogoProductos, item.producto_id, 'Producto')}
-                          permiteRecepcion={estadoInfo?.permite_recepcion ?? false}
-                          onOrdenActualizada={actualizarOrdenEnLista}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <div>
+          {ordenesPaginadas.length === 0 ? (
+            <div className="rounded-2xl border-2 border-amber-200/90 bg-white p-8 text-center text-text-secondary shadow-2xs">
+              No hay órdenes que coincidan con el término de búsqueda "{busqueda}".
+            </div>
+          ) : (
+            <ul className="space-y-4">
+              {ordenesPaginadas.map((orden) => {
+                const estadoInfo = estadosMap?.get(orden.estado)
+                const catalogoProductos = catalogosPorSucursal[orden.sucursal_id]
+                return (
+                  <li
+                    key={orden.id}
+                    className={`rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-2xs transition-all hover:border-amber-300/90 ${
+                      ordenParaResaltar === orden.id ? 'ring-2 ring-brand-primary' : ''
+                    }`}
+                  >
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-body font-bold text-text-primary">
+                          Orden #{orden.id} · {nombreDe(proveedoresMap, orden.proveedor_id, 'Proveedor')}
+                        </p>
+                        <p className="text-body-sm text-text-secondary">
+                          {nombreDe(sucursalesMap, orden.sucursal_id, 'Sucursal')} · {new Date(orden.fecha_pedido).toLocaleDateString('es-EC')} ·{' '}
+                          {orden.forma_pago}
+                          {orden.es_oferta ? ' · Compra por oferta' : ''}
+                        </p>
+                      </div>
+                      <BadgeEstado texto={estadoInfo?.etiqueta ?? orden.estado} color={COLOR_POR_ESTADO[orden.estado] ?? 'info'} />
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-amber-200/80 bg-surface-bg">
+                      <table className="w-full text-body">
+                        <thead>
+                          <tr className="border-b border-amber-200/80 bg-amber-50/70 text-left text-label uppercase text-brand-deep font-bold">
+                            <th scope="col" className="px-3 py-2">Producto</th>
+                            <th scope="col" className="px-3 py-2 text-right">Pedido</th>
+                            <th scope="col" className="px-3 py-2 text-right">Recibido</th>
+                            <th scope="col" className="px-3 py-2 text-right">Precio</th>
+                            <th scope="col" className="px-3 py-2">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orden.items.map((item) => (
+                            <FilaItem
+                              key={item.id}
+                              orden={orden}
+                              item={item}
+                              nombreProducto={nombreDe(catalogoProductos, item.producto_id, 'Producto')}
+                              permiteRecepcion={estadoInfo?.permite_recepcion ?? false}
+                              onOrdenActualizada={actualizarOrdenEnLista}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className="mt-4 rounded-2xl border-2 border-amber-200/90 bg-white shadow-2xs">
+            <Paginacion
+              paginaActual={paginaActual}
+              totalPaginas={totalPaginas}
+              totalItems={totalItems}
+              itemsPorPagina={itemsPorPagina}
+              onCambiarPagina={cambiarPagina}
+              onCambiarItemsPorPagina={cambiarItemsPorPagina}
+              etiquetaItems="órdenes"
+            />
+          </div>
+        </div>
       )}
     </div>
   )

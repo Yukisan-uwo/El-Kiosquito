@@ -13,8 +13,13 @@ import type { DatafonoDisponible, MetodoPago } from './tipos'
  * — nunca se inventa un método que el backend no devolvió. */
 const CODIGOS_METODO_VISIBLES_EN_POS = new Set(['efectivo', 'tarjeta'])
 
+function formatearMoneda(valor: number): string {
+  return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(valor)
+}
+
 interface PanelPagoProps {
   sucursalId: number
+  total?: number
   metodoPago: string | null
   datafonoId: number | null
   onCambiarMetodo: (codigo: string) => void
@@ -27,6 +32,7 @@ interface PanelPagoProps {
 
 export function PanelPago({
   sucursalId,
+  total = 0,
   metodoPago,
   datafonoId,
   onCambiarMetodo,
@@ -38,6 +44,7 @@ export function PanelPago({
 }: PanelPagoProps) {
   const [metodos, setMetodos] = useState<MetodoPago[] | null>(null)
   const [errorMetodos, setErrorMetodos] = useState<string | null>(null)
+  const [pagaCon, setPagaCon] = useState<string>('')
 
   const [datafonos, setDatafonos] = useState<DatafonoDisponible[] | null>(null)
   const [errorDatafonos, setErrorDatafonos] = useState<string | null>(null)
@@ -70,6 +77,12 @@ export function PanelPago({
   // en efectivo, elegir uno es obligatorio antes de poder cobrar.
   const faltaElegirDatafono = requiereDatafono && (datafonos?.length ?? 0) > 0 && datafonoId === null
 
+  const montoRecibidoNumerico = pagaCon.trim() ? Number(pagaCon) : 0
+  const totalVenta = total ?? 0
+  const esEfectivoInsuficiente =
+    metodoPago === 'efectivo' && montoRecibidoNumerico > 0 && montoRecibidoNumerico < totalVenta
+  const vuelto = montoRecibidoNumerico >= totalVenta ? montoRecibidoNumerico - totalVenta : 0
+
   return (
     <div className="space-y-3 border-t border-surface-bg pt-3">
       <p className="text-label uppercase text-text-secondary">Método de pago</p>
@@ -83,13 +96,77 @@ export function PanelPago({
               type="button"
               aria-pressed={metodoPago === metodo.codigo}
               onClick={() => onCambiarMetodo(metodo.codigo)}
-              className={`rounded-[var(--radius-card)] px-4 py-2 text-body ${
-                metodoPago === metodo.codigo ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
+              className={`rounded-xl px-4 py-2.5 text-body-sm font-semibold transition-all shadow-2xs ${
+                metodoPago === metodo.codigo
+                  ? 'border-2 border-brand-primary bg-brand-primary text-white shadow-xs'
+                  : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:border-brand-primary hover:bg-amber-50/50'
               }`}
             >
               {metodo.etiqueta}
             </button>
           ))}
+        </div>
+      )}
+
+      {metodoPago === 'efectivo' && (
+        <div className="space-y-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50/40 p-3 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <label htmlFor="paga-con" className="text-label uppercase text-brand-deep font-bold">
+              Paga con (efectivo):
+            </label>
+            <div className="flex items-center gap-1">
+              <span className="text-text-secondary font-mono">$</span>
+              <input
+                id="paga-con"
+                type="number"
+                step="0.01"
+                min={0}
+                value={pagaCon}
+                onChange={(e) => setPagaCon(e.target.value)}
+                placeholder={totalVenta > 0 ? totalVenta.toFixed(2) : '0.00'}
+                className="w-28 rounded-xl border-2 border-amber-300/90 bg-white px-2.5 py-1 text-right font-mono text-body font-bold focus:border-brand-primary focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Botones de billetes comunes */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setPagaCon(totalVenta > 0 ? totalVenta.toFixed(2) : '')}
+              className="rounded-lg border border-amber-300/80 bg-white px-2 py-1 text-xs font-semibold text-brand-deep hover:bg-amber-100/70"
+            >
+              Exacto
+            </button>
+            {[5, 10, 20, 50].map((billete) => (
+              <button
+                key={billete}
+                type="button"
+                onClick={() => setPagaCon(billete.toFixed(2))}
+                className="rounded-lg border border-amber-300/80 bg-white px-2 py-1 text-xs font-semibold text-brand-deep hover:bg-amber-100/70"
+              >
+                ${billete}
+              </button>
+            ))}
+          </div>
+
+          {/* Resultado de cambio / vuelto */}
+          {montoRecibidoNumerico > 0 && (
+            <div className="mt-2">
+              {esEfectivoInsuficiente ? (
+                <div className="rounded-xl border border-status-danger/40 bg-status-danger/10 px-3 py-2 text-body-sm font-semibold text-status-danger">
+                  Monto insuficiente: faltan {formatearMoneda(totalVenta - montoRecibidoNumerico)}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between rounded-xl border border-status-success/40 bg-status-success/15 px-3 py-2 text-status-success">
+                  <span className="text-label uppercase font-bold tracking-wider">Vuelto a entregar:</span>
+                  <span className="font-display text-title font-bold">
+                    {formatearMoneda(vuelto)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -104,7 +181,7 @@ export function PanelPago({
             id="datafono"
             value={datafonoId ?? ''}
             onChange={(evento) => onCambiarDatafono(evento.target.value ? Number(evento.target.value) : null)}
-            className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+            className="w-full rounded-xl border-2 border-amber-300/80 bg-white px-3 py-2 text-body focus:border-brand-primary"
           >
             <option value="">Elegí un datáfono...</option>
             {datafonos.map((datafono) => (
@@ -120,8 +197,8 @@ export function PanelPago({
 
       <Boton
         onClick={onCobrar}
-        disabled={!puedeCobrar || !metodoPago || faltaElegirDatafono || procesando}
-        className="w-full"
+        disabled={!puedeCobrar || !metodoPago || faltaElegirDatafono || esEfectivoInsuficiente || procesando}
+        className="w-full rounded-xl py-3 text-body font-bold shadow-sm"
       >
         {procesando ? 'Procesando venta...' : 'Cobrar'}
       </Boton>

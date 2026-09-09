@@ -100,3 +100,77 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Estilos de Impresión y Exportación de Reportes Ejecutivos */
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  /* Ocultar elementos de navegación y controles interactivos */
+  aside,
+  header,
+  nav,
+  button,
+  input,
+  select,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Mostrar encabezado y elementos específicos de reporte */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Lienzo blanco limpio y fidelidad de color de marca */
+  body {
+    background-color: #ffffff !important;
+    color: #1F2B27 !important;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+
+  #root,
+  .app-shell-container,
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Preservar fondos, bordes y colores exactos de gráficos y badges */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Prevención de cortes de página incómodos */
+  .print-break-inside-avoid,
+  tr,
+  .card-kpi,
+  .recharts-responsive-container {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Tablas de datos en impresión */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    padding: 6px 8px !important;
+  }
+}
+

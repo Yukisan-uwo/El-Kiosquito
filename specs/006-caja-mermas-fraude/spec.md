@@ -50,6 +50,7 @@ Como Cajero, quiero abrir y cerrar mi turno de caja sin calcular la diferencia a
 - **RF-CMF-015** *(añadido en enmienda v1.2)*: El catálogo de causas de merma DEBE declarar, por causa, si es **atribuible a una persona** — es lo que permite separar la pérdida por robo externo o caducidad (sin responsable interno) de la causada por error humano o fraude interno, que es la base del cruce merma × cuadre de caja de OT3.4.
 - **RF-CMF-016** *(añadido en enmienda v1.2)*: El sistema DEBE permitir consultar el listado de mermas filtrado por si la causa es atribuible a una persona, sin que el consumidor tenga que enumerar los códigos de causa.
 - **RF-CMF-017** *(añadido en enmienda v1.2)*: El sistema DEBE exponer los cinco catálogos de este módulo como consulta.
+- **RF-CMF-018** *(añadido en enmienda v1.4, calculadora de efectivo y vuelto en POS)*: Al seleccionar el método de pago en efectivo en el punto de venta, la interfaz DEBE ofrecer una calculadora interactiva de efectivo con botones rápidos de denominaciones ($5, $10, $20, $50, Exacto) y cálculo automático del vuelto exacto a entregar al cliente.
 
 ## Requisitos No Funcionales
 
@@ -68,6 +69,7 @@ Como Cajero, quiero abrir y cerrar mi turno de caja sin calcular la diferencia a
 - **RN-CMF-007** *(añadida en enmienda v1.2)*: Ninguna consulta ni informe puede determinar si una merma es atribuible a una persona enumerando códigos de causa a mano; DEBE leerse de `causa_merma.es_atribuible_a_persona`. Una lista escrita a mano se puede quedar corta al agregarse una causa nueva, y el efecto de ese olvido es que un fraude interno se contabilice como pérdida no atribuible — exactamente el error que OT3.4 existe para evitar.
 - **RN-CMF-008** *(añadida en enmienda v1.2)*: Ninguna fila de catálogo se borra; baja lógica con `activo = false`. Las mermas históricas deben conservar el significado de su causa.
 - **RN-CMF-009** *(añadida en enmienda v1.3, auditoría de riesgos derivados 2026-09-05)*: Un arqueo parcial de turno (`arqueo_parcial_turno`) solo puede registrarse contra un turno `abierto`, y si `monto_contado` no coincide con el monto esperado acumulado en ese instante, `motivo_diferencia` es obligatorio (mismo criterio que RN-CMF-002 al cierre). A diferencia de `punto_control_horario_turno` (RN-CMF-006, exclusivamente automático, sin conteo físico), el arqueo parcial es un conteo real y voluntario — nunca un job obligatorio — que un cajero o un encargado de sucursal puede registrar en cualquier momento del turno. Cierra el gap de "cuadre de caja horario real": antes de esta enmienda, un fraude revertido antes del cierre del turno era invisible incluso con los checkpoints automáticos, porque estos nunca comparan contra efectivo contado de verdad.
+- **RN-CMF-010** *(añadida en enmienda v1.4)*: El sistema DEBE impedir concretar una venta en efectivo si el monto ingresado como entregado por el cliente es insuficiente para cubrir el total a cobrar, deshabilitando el botón de cobro hasta que se registre un importe igual o superior al total.
 
 ## Caso límite adicional (enmienda v1.1)
 

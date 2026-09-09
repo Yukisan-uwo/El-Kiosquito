@@ -63,6 +63,7 @@ Como Encargado de Compras, cuando un proveedor me ofrece un producto a un precio
 
 - **RN-CP-002** *(añadida en enmienda v1.2)*: Si una orden admite o no nuevas recepciones DEBE leerse de `estado_orden_compra.permite_recepcion`, nunca de una comparación contra estados escritos a mano en el servicio.
 - **RN-CP-003** *(añadida en enmienda v1.2)*: Ninguna fila de catálogo se borra; baja lógica con `activo = false`. Las órdenes históricas deben conservar el significado de su forma de pago.
+- **RN-CP-004** *(añadida en enmienda v1.3, validación estricta de compras)*: Todo ítem de una orden de compra (`detalle_orden_compra`) DEBE tener `precio_ofrecido > 0.00` y `cantidad_ordenada > 0`. El sistema rechaza cualquier intento de registrar órdenes con costo unitario o cantidad cero.
 
 ## Caso límite adicional (enmienda v1.1)
 

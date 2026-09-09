@@ -7,6 +7,7 @@
 import { apiFetch } from '@/api/client'
 import type {
   ClienteOut,
+  CuponOut,
   DatafonoDisponible,
   MetodoPago,
   PoliticaPrivacidad,
@@ -24,11 +25,19 @@ export function buscarClientes(q: string): Promise<ClienteOut[]> {
 
 export function buscarProductos(
   sucursalId: number,
-  filtro: { q?: string; codigoBarras?: string },
+  filtro?: { q?: string; codigoBarras?: string },
 ): Promise<ProductoBusqueda[]> {
   return apiFetch<ProductoBusqueda[]>('/productos', {
-    query: { sucursal_id: sucursalId, q: filtro.q, codigo_barras: filtro.codigoBarras },
+    query: {
+      sucursal_id: sucursalId,
+      q: filtro?.q ? filtro.q : undefined,
+      codigo_barras: filtro?.codigoBarras ? filtro.codigoBarras : undefined,
+    },
   })
+}
+
+export function listarVentasTurno(turnoId: number, limite: number = 10): Promise<VentaOut[]> {
+  return apiFetch<VentaOut[]>('/ventas', { query: { turno_caja_id: turnoId, limite } })
 }
 
 /** 404 (sin turno abierto) se propaga como ApiError — el llamador decide
@@ -92,4 +101,19 @@ export interface VentaCrearIn {
 
 export function crearVenta(payload: VentaCrearIn): Promise<VentaOut> {
   return apiFetch<VentaOut>('/ventas', { method: 'POST', body: payload })
+}
+
+export function validarCupon(codigo: string): Promise<CuponOut> {
+  return apiFetch<CuponOut>(`/promociones/cupones/validar/${encodeURIComponent(codigo)}`)
+}
+
+export function consultarCuponesCliente(clienteId: number): Promise<CuponOut[]> {
+  return apiFetch<CuponOut[]>(`/clientes/${clienteId}/cupones`)
+}
+
+export function canjearCupon(cuponId: number, ventaId: number): Promise<CuponOut> {
+  return apiFetch<CuponOut>(`/promociones/cupones/${cuponId}/canjear`, {
+    method: 'PATCH',
+    body: { venta_id: ventaId },
+  })
 }

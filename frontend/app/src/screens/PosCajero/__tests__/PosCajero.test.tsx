@@ -26,6 +26,10 @@ const consultarPoliticaPrivacidadMock = vi.fn()
 const buscarClientesMock = vi.fn()
 const crearClienteMock = vi.fn()
 const crearVentaMock = vi.fn()
+const listarVentasTurnoMock = vi.fn()
+const validarCuponMock = vi.fn()
+const consultarCuponesClienteMock = vi.fn()
+const canjearCuponMock = vi.fn()
 
 vi.mock('../api', () => ({
   obtenerTurnoActual: (...args: unknown[]) => obtenerTurnoActualMock(...args),
@@ -38,6 +42,10 @@ vi.mock('../api', () => ({
   buscarClientes: (...args: unknown[]) => buscarClientesMock(...args),
   crearCliente: (...args: unknown[]) => crearClienteMock(...args),
   crearVenta: (...args: unknown[]) => crearVentaMock(...args),
+  listarVentasTurno: (...args: unknown[]) => listarVentasTurnoMock(...args),
+  validarCupon: (...args: unknown[]) => validarCuponMock(...args),
+  consultarCuponesCliente: (...args: unknown[]) => consultarCuponesClienteMock(...args),
+  canjearCupon: (...args: unknown[]) => canjearCuponMock(...args),
 }))
 
 const TURNO_ABIERTO: TurnoCaja = {
@@ -77,6 +85,10 @@ beforeEach(() => {
   listarMetodosPagoMock.mockResolvedValue(METODOS_PAGO)
   listarDatafonosDisponiblesMock.mockResolvedValue([])
   buscarProductosMock.mockResolvedValue([PRODUCTO])
+  listarVentasTurnoMock.mockResolvedValue([])
+  validarCuponMock.mockResolvedValue(null)
+  consultarCuponesClienteMock.mockResolvedValue([])
+  canjearCuponMock.mockResolvedValue(null)
 })
 
 /** Busca "leche" (dispara el debounce real de BusquedaProductos) y agrega
@@ -279,13 +291,9 @@ describe('PosCajero — venta completa con turno abierto', () => {
     await agregarLecheAlCarrito()
     await userEvent.click(screen.getByRole('button', { name: 'Buscar cliente' }))
 
-    // un solo carácter no dispara la búsqueda (RN-CF-006 del backend, replicado en el frontend)
-    await userEvent.type(screen.getByLabelText('Buscar cliente (nombre o contacto)'), 'm')
-    expect(buscarClientesMock).not.toHaveBeenCalled()
-
-    await userEvent.type(screen.getByLabelText('Buscar cliente (nombre o contacto)'), 'aria')
+    await userEvent.type(screen.getByLabelText('Buscar cliente (nombre o contacto)'), 'maria')
     await waitFor(() => expect(buscarClientesMock).toHaveBeenCalledWith('maria'))
-    await userEvent.click(await screen.findByRole('button', { name: 'Mariana Torres' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Mariana Torres/ }))
 
     expect(screen.getByText('Mariana Torres')).toBeInTheDocument()
     expect(screen.queryByLabelText('Buscar cliente (nombre o contacto)')).not.toBeInTheDocument()
@@ -307,6 +315,51 @@ describe('PosCajero — venta completa con turno abierto', () => {
 
     expect(await screen.findByText('Stock insuficiente de producto 77 en esta sucursal')).toBeInTheDocument()
     expect(screen.queryByText(/registrada/)).not.toBeInTheDocument()
+  })
+
+  it('permite aplicar un cupón recibido por correo y canjearlo al concretar la venta (RN-PI-001)', async () => {
+    validarCuponMock.mockResolvedValue({
+      id: 99,
+      cliente_id: 1,
+      tipo_origen: 'churn_recuperacion',
+      codigo: 'PROMO10',
+      descuento_tipo: 'porcentaje',
+      descuento_valor: 10,
+      fecha_envio: '2026-09-01T00:00:00Z',
+      fecha_expiracion: '2026-12-31T23:59:59Z',
+      estado: 'activo',
+    })
+    canjearCuponMock.mockResolvedValue({ id: 99, estado: 'canjeado' })
+    crearVentaMock.mockResolvedValue({
+      id: 88,
+      numero_documento: 'F88',
+      sucursal_id: 901,
+      turno_caja_id: 501,
+      total: 1.29,
+      metodo_pago: 'efectivo',
+      estado_venta: 'completada',
+      datafono_id: null,
+    } satisfies VentaOut)
+
+    render(<PosCajero />)
+    await screen.findByText('Punto de venta')
+    await agregarLecheAlCarrito() // Leche cuesta $1.25
+
+    // Escribir y aplicar cupón
+    const inputCupon = screen.getByLabelText('Código de cupón')
+    await userEvent.type(inputCupon, 'promo10')
+    await userEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+
+    await waitFor(() => expect(validarCuponMock).toHaveBeenCalledWith('PROMO10'))
+    expect(await screen.findByText('PROMO10')).toBeInTheDocument()
+    expect(screen.getByText(/10% de descuento/)).toBeInTheDocument()
+
+    // Cobrar
+    await userEvent.click(await screen.findByRole('button', { name: 'Efectivo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cobrar' }))
+
+    await waitFor(() => expect(crearVentaMock).toHaveBeenCalled())
+    await waitFor(() => expect(canjearCuponMock).toHaveBeenCalledWith(99, 88))
   })
 })
 

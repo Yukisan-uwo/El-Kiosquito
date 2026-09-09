@@ -23,7 +23,6 @@ export const DATOS_CLIENTE_NUEVO_VACIOS: DatosClienteNuevo = {
   aceptoPolitica: false,
 }
 
-const LONGITUD_MINIMA_BUSQUEDA = 2
 const RETRASO_DEBOUNCE_MS = 300
 
 interface ClienteVentaProps {
@@ -99,15 +98,19 @@ export function ClienteVenta({
     }
   }
 
+  function abrirBusquedaClientes() {
+    if (clienteExistente !== null) return
+    if (resultados === null && !cargandoBusqueda) {
+      ejecutarBusquedaCliente(textoBusqueda.trim())
+    }
+  }
+
   useEffect(() => {
     if (modo !== 'existente' || clienteExistente !== null) return
     const consulta = textoBusqueda.trim()
-    if (consulta.length < LONGITUD_MINIMA_BUSQUEDA) {
-      setResultados(null)
-      setErrorBusqueda(null)
-      return
-    }
-    const temporizador = setTimeout(() => ejecutarBusquedaCliente(consulta), RETRASO_DEBOUNCE_MS)
+    const temporizador = setTimeout(() => {
+      ejecutarBusquedaCliente(consulta)
+    }, RETRASO_DEBOUNCE_MS)
     return () => clearTimeout(temporizador)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textoBusqueda, modo, clienteExistente])
@@ -118,13 +121,15 @@ export function ClienteVenta({
       setTextoBusqueda('')
       setResultados(null)
       setErrorBusqueda(null)
+    } else {
+      ejecutarBusquedaCliente('')
     }
   }
 
   function quitarClienteExistente() {
     onCambiarClienteExistente(null)
     setTextoBusqueda('')
-    setResultados(null)
+    ejecutarBusquedaCliente('')
   }
 
   return (
@@ -135,8 +140,10 @@ export function ClienteVenta({
           type="button"
           onClick={() => cambiarModo('sin_cliente')}
           aria-pressed={modo === 'sin_cliente'}
-          className={`rounded-[var(--radius-card)] px-3 py-2 text-body ${
-            modo === 'sin_cliente' ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
+          className={`rounded-xl px-3 py-2 text-body-sm font-semibold transition-all shadow-2xs ${
+            modo === 'sin_cliente'
+              ? 'border-2 border-brand-primary bg-brand-primary text-white shadow-xs'
+              : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:border-brand-primary hover:bg-amber-50/50'
           }`}
         >
           Sin cliente
@@ -145,8 +152,10 @@ export function ClienteVenta({
           type="button"
           onClick={() => cambiarModo('existente')}
           aria-pressed={modo === 'existente'}
-          className={`rounded-[var(--radius-card)] px-3 py-2 text-body ${
-            modo === 'existente' ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
+          className={`rounded-xl px-3 py-2 text-body-sm font-semibold transition-all shadow-2xs ${
+            modo === 'existente'
+              ? 'border-2 border-brand-primary bg-brand-primary text-white shadow-xs'
+              : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:border-brand-primary hover:bg-amber-50/50'
           }`}
         >
           Buscar cliente
@@ -155,8 +164,10 @@ export function ClienteVenta({
           type="button"
           onClick={() => cambiarModo('nuevo')}
           aria-pressed={modo === 'nuevo'}
-          className={`rounded-[var(--radius-card)] px-3 py-2 text-body ${
-            modo === 'nuevo' ? 'bg-brand-primary text-white' : 'border border-brand-primary-soft text-text-secondary'
+          className={`rounded-xl px-3 py-2 text-body-sm font-semibold transition-all shadow-2xs ${
+            modo === 'nuevo'
+              ? 'border-2 border-brand-primary bg-brand-primary text-white shadow-xs'
+              : 'border-2 border-amber-200/90 bg-white text-brand-deep hover:border-brand-primary hover:bg-amber-50/50'
           }`}
         >
           Registrar cliente nuevo
@@ -164,11 +175,11 @@ export function ClienteVenta({
       </div>
 
       {modo === 'existente' && (
-        <div className="space-y-3 rounded-[var(--radius-card)] bg-surface-card p-4">
+        <div className="space-y-3 rounded-2xl border-2 border-amber-200/80 bg-white p-4 shadow-2xs">
           {clienteExistente ? (
             <div className="flex items-center justify-between gap-3">
               <p className="text-body text-text-primary">
-                Cliente: <span className="font-medium">{clienteExistente.nombre}</span>
+                Cliente: <span className="font-medium text-brand-deep font-display">{clienteExistente.nombre}</span>
               </p>
               <Boton variante="ghost" onClick={quitarClienteExistente}>
                 Cambiar
@@ -185,9 +196,11 @@ export function ClienteVenta({
                   type="text"
                   autoComplete="off"
                   value={textoBusqueda}
+                  onFocus={abrirBusquedaClientes}
+                  onClick={abrirBusquedaClientes}
                   onChange={(evento) => setTextoBusqueda(evento.target.value)}
-                  placeholder="Ej. María, o el teléfono"
-                  className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2.5 text-body focus:border-brand-primary"
+                  placeholder="Presiona para ver clientes o escribe para filtrar..."
+                  className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
                 />
               </div>
 
@@ -205,15 +218,16 @@ export function ClienteVenta({
               )}
 
               {!cargandoBusqueda && !errorBusqueda && resultados !== null && resultados.length > 0 && (
-                <ul className="space-y-2">
+                <ul className="max-h-60 overflow-y-auto space-y-1.5 rounded-xl border-2 border-amber-200/90 bg-amber-50/40 p-2 shadow-2xs">
                   {resultados.map((cliente) => (
                     <li key={cliente.id}>
                       <button
                         type="button"
                         onClick={() => onCambiarClienteExistente(cliente)}
-                        className="w-full rounded-[var(--radius-card)] bg-surface-bg p-3 text-left text-body text-text-primary hover:bg-brand-primary-soft"
+                        className="w-full rounded-xl border border-amber-200/60 bg-white p-2.5 text-left text-body text-text-primary hover:bg-amber-100/70 hover:border-brand-primary transition-all flex items-center justify-between"
                       >
-                        {cliente.nombre}
+                        <span className="font-medium">{cliente.nombre}</span>
+                        <span className="text-label font-mono text-text-secondary">ID #{cliente.id}</span>
                       </button>
                     </li>
                   ))}
@@ -225,7 +239,7 @@ export function ClienteVenta({
       )}
 
       {modo === 'nuevo' && (
-        <div className="space-y-3 rounded-[var(--radius-card)] bg-surface-card p-4">
+        <div className="space-y-3 rounded-2xl border-2 border-amber-200/80 bg-white p-4 shadow-2xs">
           <div>
             <label htmlFor="cliente-nombre" className="mb-1 block text-label uppercase text-text-secondary">
               Nombre
@@ -236,7 +250,7 @@ export function ClienteVenta({
               required
               value={datos.nombre}
               onChange={(evento) => onCambiarDatos({ ...datos, nombre: evento.target.value })}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
           <div>
@@ -248,7 +262,7 @@ export function ClienteVenta({
               type="text"
               value={datos.contacto}
               onChange={(evento) => onCambiarDatos({ ...datos, contacto: evento.target.value })}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
           <div>
@@ -260,7 +274,7 @@ export function ClienteVenta({
               type="date"
               value={datos.fechaNacimiento}
               onChange={(evento) => onCambiarDatos({ ...datos, fechaNacimiento: evento.target.value })}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
             />
           </div>
 
@@ -279,8 +293,8 @@ export function ClienteVenta({
                   className="mt-1"
                 />
                 <span>
-                  El cliente acepta la política de privacidad (versión {politica.version}, vigente desde{' '}
-                  {politica.vigente_desde}) — Art. 10.4 LOPDP.
+                  El cliente acepta la política de tratamiento de datos personales (versión {politica.version}, vigente desde{' '}
+                  {politica.vigente_desde}).
                 </span>
               </label>
             </div>

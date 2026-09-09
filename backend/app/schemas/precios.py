@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class PrecioCrearIn(BaseModel):
     producto_id: int
     sucursal_id: int
-    precio_venta: Decimal = Field(ge=0)
+    precio_venta: Decimal = Field(gt=0)
 
 
 class HistorialPrecioOut(BaseModel):
@@ -38,7 +38,7 @@ class MargenRealOut(BaseModel):
 class PrecioCompetenciaCrearIn(BaseModel):
     producto_id: int
     fuente_competencia_id: int
-    precio_referencia: Decimal = Field(ge=0)
+    precio_referencia: Decimal = Field(gt=0)
 
 
 class ComparativaCompetenciaOut(BaseModel):
@@ -100,7 +100,7 @@ class ClasificacionHistorialOut(BaseModel):
 class RecomendacionCrearIn(BaseModel):
     producto_id: int
     sucursal_id: int
-    precio_recomendado: Decimal = Field(ge=0)
+    precio_recomendado: Decimal = Field(gt=0)
     justificacion: str = Field(min_length=10)
 
 

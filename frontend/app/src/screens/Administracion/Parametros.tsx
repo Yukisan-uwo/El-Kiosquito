@@ -7,7 +7,7 @@ import { consultarParametroVigente, registrarParametroSistema } from './api'
 import type { ParametroSistema } from './tipos'
 
 const CLAVES_CONOCIDAS = [
-  { clave: 'iva', etiqueta: 'IVA (Art. 4.1)' },
+  { clave: 'iva', etiqueta: 'IVA (Tasa vigente)' },
   { clave: 'moneda', etiqueta: 'Moneda' },
 ]
 
@@ -74,8 +74,8 @@ function TarjetaParametro({ clave, etiqueta }: TarjetaParametroProps) {
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] bg-surface-card p-4 shadow-[var(--shadow-elevation-1)]">
-      <p className="text-title text-text-primary">{etiqueta}</p>
+    <div className="rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-2xs hover:border-amber-300/90 transition-all">
+      <p className="text-title text-brand-deep font-bold">{etiqueta}</p>
       {cargando && <EsqueletoCarga filas={1} alturaPx={32} />}
       {!cargando && error && <MensajeError mensaje={error} onReintentar={consultar} />}
       {!cargando && !error && (
@@ -83,28 +83,28 @@ function TarjetaParametro({ clave, etiqueta }: TarjetaParametroProps) {
           {nuncaRegistrado && <p className="mt-1 text-body text-text-secondary">Todavía no se registró ningún valor.</p>}
           {vigente && (
             <p className="mt-1 text-body text-text-secondary">
-              Vigente: <span className="font-medium text-text-primary">{vigente.valor}</span> desde{' '}
+              Vigente: <span className="font-semibold text-brand-deep">{vigente.valor}</span> desde{' '}
               {new Date(vigente.vigente_desde).toLocaleString('es-EC')}
             </p>
           )}
           {!editando && (
-            <Boton variante="ghost" type="button" className="mt-2" onClick={() => setEditando(true)}>
+            <Boton variante="secundario" type="button" className="mt-3" onClick={() => setEditando(true)}>
               Registrar nuevo valor
             </Boton>
           )}
           {editando && (
-            <form onSubmit={manejarGuardar} className="mt-2 flex flex-wrap items-center gap-2">
+            <form onSubmit={manejarGuardar} className="mt-3 flex flex-wrap items-center gap-2">
               <input
                 value={valorNuevo}
                 onChange={(evento) => setValorNuevo(evento.target.value)}
                 placeholder={clave === 'iva' ? 'p. ej. 0.15' : 'p. ej. USD'}
                 required
-                className="w-40 rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2 text-body"
+                className="w-44 rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body focus:border-brand-primary"
               />
               <Boton type="submit" disabled={guardando}>
                 {guardando ? 'Guardando…' : 'Guardar'}
               </Boton>
-              <Boton variante="ghost" type="button" onClick={() => setEditando(false)}>
+              <Boton variante="secundario" type="button" onClick={() => setEditando(false)}>
                 Cancelar
               </Boton>
             </form>
@@ -122,7 +122,7 @@ export function Parametros() {
       <p className="text-body text-text-secondary">
         El IVA y la moneda son parámetros con historial completo (nunca se sobrescriben): cada cambio queda registrado
         con la fecha desde la que aplicó, para que una venta pasada siga mostrando la tasa que realmente le
-        correspondió (CA-AD-002).
+        correspondió.
       </p>
       {CLAVES_CONOCIDAS.map(({ clave, etiqueta }) => (
         <TarjetaParametro key={clave} clave={clave} etiqueta={etiqueta} />

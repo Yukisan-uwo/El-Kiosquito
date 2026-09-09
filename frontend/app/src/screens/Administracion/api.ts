@@ -8,8 +8,12 @@
  */
 import { apiFetch, ApiError } from '@/api/client'
 import type {
+  ChecklistItem,
   ClienteBusqueda,
+  EstadoApertura,
   EstadoSolicitudArco,
+  HerenciaCatalogo,
+  ItemChecklistCatalogo,
   LogAuditoria,
   Operacion,
   ParametroSistema,
@@ -78,6 +82,39 @@ export function listarRoles(): Promise<Rol[]> {
 
 export function listarSucursales(estado?: string): Promise<Sucursal[]> {
   return apiFetch<Sucursal[]>('/sucursales', { query: { estado } })
+}
+
+export interface SucursalCrearIn {
+  nombre: string
+  direccion: string
+}
+
+export function crearSucursal(payload: SucursalCrearIn): Promise<Sucursal> {
+  return apiFetch<Sucursal>('/sucursales', { method: 'POST', body: payload })
+}
+
+export function consultarEstadoApertura(sucursalId: number): Promise<EstadoApertura> {
+  return apiFetch<EstadoApertura>(`/sucursales/${sucursalId}/estado-apertura`)
+}
+
+export function completarItemChecklist(sucursalId: number, itemCodigo: string): Promise<ChecklistItem> {
+  return apiFetch<ChecklistItem>(`/sucursales/${sucursalId}/checklist/${itemCodigo}`, { method: 'PATCH' })
+}
+
+export function heredarCatalogo(sucursalId: number): Promise<HerenciaCatalogo> {
+  return apiFetch<HerenciaCatalogo>(`/sucursales/${sucursalId}/heredar-catalogo`, { method: 'POST' })
+}
+
+export function activarSucursal(sucursalId: number): Promise<Sucursal> {
+  return apiFetch<Sucursal>(`/sucursales/${sucursalId}/activar`, { method: 'POST' })
+}
+
+export function cerrarSucursal(sucursalId: number): Promise<Sucursal> {
+  return apiFetch<Sucursal>(`/sucursales/${sucursalId}/cerrar`, { method: 'PATCH' })
+}
+
+export function listarItemsChecklistApertura(soloActivos: boolean = true): Promise<ItemChecklistCatalogo[]> {
+  return apiFetch<ItemChecklistCatalogo[]>('/catalogos/items-checklist-apertura', { query: { solo_activos: soloActivos } })
 }
 
 export function listarRecursosSistema(): Promise<RecursoSistema[]> {

@@ -74,11 +74,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /promociones/cupones/validar/{codigo}:
+    get:
+      summary: Validar un cupón por código para el punto de venta (RF-PI-008, RN-PI-001)
+      description: >
+        Valida que el código de cupón recibido por el cliente (ej. por correo electrónico, Art. 8.4)
+        exista en el sistema, pertenezca a un cupón en estado activo y no esté expirado.
+      security:
+        - bearerAuth: [cajero, encargado_sucursal, gerencia]
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Código alfanumérico del cupón presentado por el cliente
+      responses:
+        '200':
+          description: Cupón válido y disponible para canje
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupon'
+        '404':
+          description: Cupón no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Cupón expirado, ya canjeado o no activo (RN-PI-001)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /clientes/{cliente_id}/cupones:
     get:
-      summary: Consultar cupones activos e históricos de un cliente (RF-PI-003)
+      summary: Consultar cupones activos e históricos de un cliente (RF-PI-003, RF-PI-009)
       security:
-        - bearerAuth: [fidelizacion, encargado_sucursal, gerencia]
+        - bearerAuth: [cajero, fidelizacion, encargado_sucursal, gerencia]
       parameters:
         - name: cliente_id
           in: path

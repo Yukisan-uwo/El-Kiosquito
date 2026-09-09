@@ -27,6 +27,7 @@ La cascada de objetivos asigna a Administración dos objetivos tácticos (OT4.2 
 - **RF-AD-012** *(añadido en enmienda v1.1)*: Los recursos protegidos por la matriz de permisos y los auditados por el log DEBEN provenir del mismo catálogo (`recurso_sistema`), de modo que el log no pueda registrar un recurso que la matriz de permisos no conoce.
 - **RF-AD-013** *(añadido en enmienda v1.1)*: Cada tipo de solicitud ARCO DEBE declarar su plazo legal de respuesta en días, y el sistema DEBE permitir consultar las solicitudes vencidas — hoy se registran las fechas de solicitud y de resolución pero no hay contra qué compararlas.
 - **RF-AD-014** *(añadido en enmienda v1.1)*: El sistema DEBE exponer los cinco catálogos de este módulo como consulta, en modo solo lectura.
+- **RF-AD-015** *(añadido en enmienda v1.2, permisos POS)*: La matriz de permisos RBAC del sistema (`permiso_rol`) DEBE asignar al rol `cajero` las operaciones de lectura (`cupon:leer`) y actualización/canje (`cupon:actualizar`) sobre el recurso `cupon` para habilitar la validación y canje de promociones en el punto de venta.
 
 ## Requisitos No Funcionales
 
@@ -34,6 +35,7 @@ La cascada de objetivos asigna a Administración dos objetivos tácticos (OT4.2 
 - **RNF-AD-002** (Seguridad): las contraseñas se almacenan exclusivamente como hash bcrypt; el endpoint de login nunca devuelve ni registra la contraseña en texto plano, ni siquiera en el log de auditoría (Art. 10.7).
 - **RNF-AD-003** (Mantenibilidad): `permiso_rol` (la matriz de permisos) se siembra por migración, no por endpoint de escritura — modificarla equivale a una enmienda de la jerarquía de roles del Art. 3, que el Art. 9.1 exige versionar formalmente.
 - **RNF-AD-004** (Portabilidad de datos, ISO 25012): la exportación del log de auditoría DEBE soportar al menos formato CSV, para cumplir con la obligación de poder entregarlo a la APDP dentro de las 72 horas del Art. 10.5.
+- **RNF-AD-005** (Persistencia y disponibilidad de sesión): El token JWT de autenticación emitido por el sistema tiene una vigencia estándar de 8 horas (`exp = 28800 segundos`). El cliente frontend DEBE garantizar la persistencia del token y la restauración sincrónica del estado de sesión en almacenamiento local/sesión (`localStorage`/`sessionStorage`), previniendo condiciones de carrera al recargar la página (F5) que pudieran expulsar al usuario al login antes de que expire su vigencia.
 
 ## Reglas de Negocio
 

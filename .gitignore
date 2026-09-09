@@ -19,6 +19,7 @@ frontend/app/coverage/
 .pytest_cache/
 .mypy_cache/
 *.log
+*.tar.gz
 
 # Volúmenes/datos locales de Docker (si algún día se montan a disco en vez
 # de volumes nombrados)

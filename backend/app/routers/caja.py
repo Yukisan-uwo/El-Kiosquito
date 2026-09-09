@@ -173,6 +173,24 @@ def consultar_turno_actual(
     return turno
 
 
+@router.get("/caja/turnos", response_model=list[TurnoCajaOut], tags=["caja"])
+def listar_turnos(
+    sucursal_id: int | None = Query(None, description="Filtrar por sucursal"),
+    estado: str | None = Query(None, description="Filtrar por estado del turno"),
+    limite: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_permission("turno_caja", "leer")),
+) -> list[TurnoCaja]:
+    """Lista los turnos de caja de la sucursal para supervisión de caja y arqueos."""
+    query = db.query(TurnoCaja)
+    if sucursal_id is not None:
+        verificar_alcance_sucursal(db, current_user, sucursal_id)
+        query = query.filter(TurnoCaja.sucursal_id == sucursal_id)
+    if estado is not None:
+        query = query.filter(TurnoCaja.estado == estado)
+    return query.order_by(TurnoCaja.hora_apertura.desc()).limit(limite).all()
+
+
 @router.patch("/caja/turnos/{id}/cerrar", response_model=TurnoCajaOut, tags=["caja"])
 def cerrar_turno(
     id: int,

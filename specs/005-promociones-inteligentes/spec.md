@@ -37,6 +37,9 @@ Como Encargado de Fidelización, quiero enviar cupones personalizados según el 
 - **RF-PI-005** *(añadido en enmienda v1.1, normalización de catálogos)*: El origen, el tipo de descuento y el estado de un cupón DEBEN seleccionarse de sus catálogos (`tipo_origen_cupon`, `tipo_descuento`, `estado_cupon`), nunca escribirse como texto libre ni quedar fijos en el contrato de la API.
 - **RF-PI-006** *(añadido en enmienda v1.1)*: El sistema DEBE rechazar un cupón cuyo `descuento_valor` supere el máximo permitido para su tipo de descuento.
 - **RF-PI-007** *(añadido en enmienda v1.1)*: El sistema DEBE exponer los tres catálogos como consulta, incluyendo `es_automatico` de `tipo_origen_cupon`, que `011-analitica-reportes` necesita para calcular correctamente el indicador de OT2.3.
+- **RF-PI-008** *(añadido en enmienda v1.3, integración con Punto de Venta POS)*: El sistema DEBE proveer un endpoint de validación de cupones por código (`GET /promociones/cupones/validar/{codigo}`), para verificar en tiempo real que el código presentado por el cliente en caja (enviado previamente por correo electrónico, Art. 8.4) exista, esté activo y no esté expirado (RN-PI-001).
+- **RF-PI-009** *(añadido en enmienda v1.3)*: El punto de venta DEBE consultar los cupones activos del cliente registrado (`GET /clientes/{cliente_id}/cupones`) y permitir aplicarlos de forma asistida con un solo clic.
+- **RF-PI-010** *(añadido en enmienda v1.3)*: Al confirmar la venta en el POS, si se aplicó un cupón, el sistema DEBE ejecutar automáticamente el canje transaccional (`PATCH /promociones/cupones/{id}/canjear`), actualizando su estado a `canjeado` y enlazando `venta_id_canje`.
 
 ## Requisitos No Funcionales
 
@@ -50,6 +53,7 @@ Como Encargado de Fidelización, quiero enviar cupones personalizados según el 
 - **RN-PI-003** *(añadida en enmienda v1.1)*: Ninguna fila de los tres catálogos se borra; baja lógica con `activo = false`. Un cupón ya emitido debe conservar el significado de su tipo de origen y de descuento.
 - **RN-PI-004** *(añadida en enmienda v1.1)*: `descuento_valor` nunca puede superar el `valor_maximo_permitido` de su tipo de descuento. Hoy `descuento_valor` solo valida `>= 0`, así que un cupón de 200% de descuento se puede crear sin ningún error — el sistema terminaría pagándole al cliente por llevarse el producto.
 - **RN-PI-005** *(añadida en enmienda v1.2, auditoría de riesgos derivados)*: una fila de `sugerencia_patron_compra` nunca crea un `cupon` por sí sola. El motor de asociación (`POST /promociones/sugerencias-patron/recalcular`) decide únicamente QUÉ producto sugerirle a qué cliente, basado en soporte/confianza/lift reales sobre `detalle_venta`/`venta` — nunca decide de cuánto es el descuento. `PATCH /promociones/sugerencias-patron/{id}/resolver` con `aceptar=true` exige `descuento_tipo`/`descuento_valor`/`fecha_expiracion` explícitos; sin ellos se rechaza con `422`. Antes de esta enmienda, `tipo_origen = 'patron_compra'` (Decisión 3 de `research.md`) no tenía ningún proceso real detrás — se documentaba como responsabilidad de "un proceso batch o la capa estratégica" que en la práctica no existía.
+- **RN-PI-006** *(añadida en enmienda v1.3)*: En el punto de venta, un cupón solo puede aplicarse si se encuentra en estado `activo` y vigente (`fecha_expiracion > ahora`). El valor total del descuento deducido por un cupón nunca puede superar el subtotal de la venta en curso (el total nunca puede ser negativo).
 
 ## Caso límite adicional (enmienda v1.1)
 

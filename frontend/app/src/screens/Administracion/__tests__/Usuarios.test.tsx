@@ -108,7 +108,7 @@ describe('Usuarios', () => {
 
     await userEvent.type(screen.getByLabelText('Nombre'), 'Ana Torres')
     await userEvent.type(screen.getByLabelText('Email'), 'ana@test.com')
-    await userEvent.type(screen.getByLabelText('Contraseña temporal'), 'clave1234')
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'clave1234')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar usuario' }))
 
     expect(await screen.findByText('Nueva Persona')).toBeInTheDocument()

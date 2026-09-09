@@ -81,7 +81,7 @@ def cargar_fact_venta_linea(pg_conn, ch_client, desde: date, hasta: date) -> int
                 ev.cuenta_para_ingresos,
                 dv.cantidad_venta, dv.cantidad_inventario,
                 dv.precio_unitario_aplicado, dv.subtotal_item,
-                costo.costo,
+                COALESCE(costo.costo, 0),
                 round(dv.subtotal_item - COALESCE(costo.costo, 0) * dv.cantidad_inventario, 2),
                 CASE WHEN v.hora_inicio_cobro IS NOT NULL
                      THEN EXTRACT(EPOCH FROM (v.fecha_hora - v.hora_inicio_cobro))::int
@@ -193,7 +193,7 @@ def cargar_fact_compra_recepcion(pg_conn, ch_client, desde: date, hasta: date) -
                     ELSE 0
                 END,
                 r.cantidad_recibida_evento,
-                costo.costo,
+                COALESCE(costo.costo, d.precio_ofrecido, 0),
                 (r.fecha_recepcion::date - oc.fecha_pedido::date)
             FROM recepcion_orden_compra r
             JOIN detalle_orden_compra d ON d.id = r.detalle_orden_compra_id

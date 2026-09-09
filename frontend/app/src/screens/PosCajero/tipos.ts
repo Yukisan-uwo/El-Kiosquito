@@ -16,6 +16,8 @@ export interface ProductoBusqueda {
   /** null si el producto no tiene un precio vigente en esta sucursal — el
    * POS nunca deja agregarlo al carrito en ese caso (RN-CVI-010 de 001). */
   precio_venta_vigente: number | null
+  stock_actual?: number | null
+  stock_minimo?: number | null
 }
 
 export interface TurnoCaja {
@@ -53,6 +55,7 @@ export interface VentaOut {
   metodo_pago: string
   estado_venta: string
   datafono_id: number | null
+  hora_inicio_cobro?: string | null
 }
 
 export interface PoliticaPrivacidad {
@@ -83,4 +86,19 @@ export interface ItemCarrito {
 export interface ClienteExistenteSeleccionado {
   id: number
   nombre: string
+}
+
+export interface CuponOut {
+  id: number
+  cliente_id: number
+  tipo_origen: string
+  codigo: string
+  descuento_tipo: 'porcentaje' | 'monto_fijo' | string
+  descuento_valor: number
+  fecha_envio: string
+  fecha_expiracion: string
+  estado: string
+  venta_id_canje: number | null
+  fecha_canje: string | null
+  notificacion_enviada: boolean
 }

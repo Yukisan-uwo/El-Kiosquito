@@ -41,6 +41,32 @@ export interface Sucursal {
   fecha_activacion: string | null
 }
 
+export interface ChecklistItem {
+  item: string
+  completado: boolean
+  fecha_completado: string | null
+}
+
+export interface EstadoApertura {
+  sucursal: Sucursal
+  checklist: ChecklistItem[]
+}
+
+export interface HerenciaCatalogo {
+  sucursal_id: number
+  cantidad_productos_heredados: number
+  cantidad_productos_pendientes: number
+  fecha: string
+}
+
+export interface ItemChecklistCatalogo {
+  codigo: string
+  etiqueta: string
+  orden: number
+  es_bloqueante: boolean
+  activo: boolean
+}
+
 export interface RecursoSistema {
   codigo: string
   etiqueta: string

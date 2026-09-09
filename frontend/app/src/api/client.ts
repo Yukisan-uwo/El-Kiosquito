@@ -38,9 +38,15 @@ export class ApiError extends Error {
 
 export type TokenProvider = () => string | null
 
-let obtenerToken: TokenProvider = () => null
-/** Lo llama AuthProvider una sola vez al montar — el cliente HTTP nunca lee
- * el storage directamente, así queda una sola fuente de verdad del token. */
+let obtenerToken: TokenProvider = () => {
+  try {
+    return localStorage.getItem('elkiosquito.token') || sessionStorage.getItem('elkiosquito.token')
+  } catch {
+    return null
+  }
+}
+
+/** Lo llama AuthProvider para proveer el token activo en cada petición. */
 export function registrarTokenProvider(provider: TokenProvider): void {
   obtenerToken = provider
 }

@@ -46,9 +46,9 @@ export function AbrirTurno({ sucursalId, onTurnoAbierto }: AbrirTurnoProps) {
       variants={stagger}
       initial="hidden"
       animate="visible"
-      className="mx-auto max-w-sm rounded-[var(--radius-card)] bg-surface-card p-8 shadow-[var(--shadow-elevation-1)]"
+      className="mx-auto max-w-sm rounded-2xl border-2 border-amber-200/90 bg-white p-8 shadow-sm"
     >
-      <motion.p variants={fadeUp} className="mb-1 font-display text-title text-brand-deep">
+      <motion.p variants={fadeUp} className="mb-1 font-display text-title font-bold text-brand-deep">
         Abrir turno de caja
       </motion.p>
       <motion.p variants={fadeUp} className="mb-6 text-body text-text-secondary">
@@ -68,7 +68,7 @@ export function AbrirTurno({ sucursalId, onTurnoAbierto }: AbrirTurnoProps) {
             required
             value={montoInicial}
             onChange={(evento) => setMontoInicial(evento.target.value)}
-            className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2.5 text-body focus:border-brand-primary"
+            className="w-full rounded-xl border-2 border-amber-300/80 bg-white px-3 py-2.5 text-body focus:border-brand-primary"
           />
         </motion.div>
 

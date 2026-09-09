@@ -74,7 +74,11 @@ export function listarEstadosOrdenCompra(): Promise<EstadoOrdenCompra[]> {
 // ---------------------------------------------------------------------------
 
 export function buscarProductos(sucursalId: number, q?: string): Promise<ProductoCatalogo[]> {
-  return apiFetch<ProductoCatalogo[]>('/productos', { query: { sucursal_id: sucursalId, q } })
+  const query: Record<string, string | number | boolean | undefined> = { sucursal_id: sucursalId }
+  if (q && q.trim().length > 0) {
+    query.q = q.trim()
+  }
+  return apiFetch<ProductoCatalogo[]>('/productos', { query })
 }
 
 // ---------------------------------------------------------------------------

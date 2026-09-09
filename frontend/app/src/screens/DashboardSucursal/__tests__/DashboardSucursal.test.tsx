@@ -1,8 +1,17 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render as renderOriginal, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/client'
 import { DashboardSucursal } from '../DashboardSucursal'
+
+function render(ui: React.ReactElement, initialRoute = '/sucursal') {
+  return renderOriginal(
+    <MemoryRouter initialEntries={[initialRoute]}>
+      {ui}
+    </MemoryRouter>,
+  )
+}
 
 const formatoMonedaTest = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' })
 
@@ -258,5 +267,38 @@ describe('DashboardSucursal — inventario en riesgo', () => {
     expect(filaCoca).not.toBeNull()
     expect(within(filaLeche as HTMLElement).getByText('20')).toBeInTheDocument()
     expect(within(filaCoca as HTMLElement).getByText('45')).toBeInTheDocument()
+  })
+})
+
+describe('DashboardSucursal — navegación por secciones y pestañas', () => {
+  it('filtra y muestra solo la sección de Stock Bajo cuando la URL tiene ?seccion=stock-bajo', async () => {
+    mockRutas({
+      '/productos': CATALOGO,
+      '/mermas': [],
+      '/inventario/stock-bajo': [{ producto_id: 1, cantidad_disponible: '2.000', stock_minimo: '10.000' }],
+      '/inventario/proximos-a-caducar': [],
+      '/inventario/sin-rotacion': [],
+    })
+    render(<DashboardSucursal />, '/sucursal?seccion=stock-bajo')
+    expect(await screen.findByText('Stock bajo el mínimo')).toBeInTheDocument()
+    expect(screen.queryByText('Mermas recientes')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stock Bajo' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('permite cambiar a la sección de Mermas al hacer clic en su pestaña', async () => {
+    mockRutas({
+      '/productos': CATALOGO,
+      '/mermas': [],
+      '/inventario/stock-bajo': [],
+      '/inventario/proximos-a-caducar': [],
+      '/inventario/sin-rotacion': [],
+    })
+    render(<DashboardSucursal />, '/sucursal?seccion=stock-bajo')
+    expect(await screen.findByText('Stock bajo el mínimo')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mermas' }))
+    expect(await screen.findByText('Mermas recientes')).toBeInTheDocument()
+    expect(screen.queryByText('Stock bajo el mínimo')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mermas' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

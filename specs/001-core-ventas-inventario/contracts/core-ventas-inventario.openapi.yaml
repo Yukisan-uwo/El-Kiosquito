@@ -83,6 +83,38 @@ paths:
         '422': { description: 'motivo_anulacion ausente' }
 
   /productos:
+    get:
+      summary: Buscar productos para el punto de venta (RF-CVI-027, enmienda v1.6)
+      description: >
+        Búsqueda de productos activos para el catálogo y POS de la sucursal indicada. Devuelve
+        datos de catálogo, unidad, categoría, stock actual en tiempo real y precio de venta vigente.
+      operationId: buscarProductos
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sucursal_id
+          in: query
+          required: true
+          schema: { type: integer }
+          description: Requerido para resolver precio de venta vigente y stock actual de la sucursal
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Búsqueda parcial e insensible a mayúsculas sobre el nombre
+        - name: codigo_barras
+          in: query
+          required: false
+          schema: { type: string }
+          description: Coincidencia exacta por lector de código de barras
+      responses:
+        '200':
+          description: Lista de productos encontrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductoBusqueda'
     post:
       summary: Registrar producto (RF-CVI-006, RF-CVI-007)
       operationId: crearProducto
@@ -524,3 +556,17 @@ components:
         permite_decimales: { type: boolean, description: 'habilita RN-CVI-006: un producto fraccionable exige una unidad que admita decimales' }
         orden: { type: integer }
         activo: { type: boolean }
+    ProductoBusqueda:
+      type: object
+      required: [id, nombre, categoria_id, categoria_nombre, unidad_venta_codigo, es_fraccionable, activo]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        codigo_barras: { type: string, nullable: true }
+        categoria_id: { type: integer }
+        categoria_nombre: { type: string }
+        unidad_venta_codigo: { type: string }
+        es_fraccionable: { type: boolean }
+        activo: { type: boolean }
+        precio_venta_vigente: { type: number, format: decimal, nullable: true }
+        stock_actual: { type: number, format: decimal, nullable: true, description: 'Cantidad disponible en tiempo real en la sucursal pedida' }

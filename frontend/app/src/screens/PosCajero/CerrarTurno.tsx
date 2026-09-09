@@ -6,6 +6,7 @@ import { MensajeError } from '@/components/ui/MensajeError'
 import { overlayFade, scaleIn } from '@/motion/tokens'
 import { cerrarTurno } from './api'
 import type { TurnoCaja } from './tipos'
+import { formatearFechaHora } from '@/utils/fechas'
 
 function formatearMoneda(valor: number): string {
   return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(valor)
@@ -60,11 +61,11 @@ export function CerrarTurno({ turno, onCerrado, onCancelar }: CerrarTurnoProps) 
         variants={scaleIn}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-sm rounded-[var(--radius-card)] bg-surface-card p-6 shadow-[var(--shadow-elevation-2)]"
+        className="w-full max-w-sm rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-xl"
       >
-        <p className="mb-1 font-display text-title text-brand-deep">Cerrar turno</p>
+        <p className="mb-1 font-display text-title text-brand-deep font-bold">Cerrar turno</p>
         <p className="mb-4 text-body-sm text-text-secondary">
-          Turno abierto con {formatearMoneda(turno.monto_inicial)} desde el {new Date(turno.hora_apertura).toLocaleString('es-EC')}.
+          Turno abierto con {formatearMoneda(turno.monto_inicial)} desde el {formatearFechaHora(turno.hora_apertura)}.
         </p>
 
         <form onSubmit={manejarEnvio} className="space-y-4">
@@ -80,7 +81,7 @@ export function CerrarTurno({ turno, onCerrado, onCancelar }: CerrarTurnoProps) 
               required
               value={montoContado}
               onChange={(evento) => setMontoContado(evento.target.value)}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2.5 text-body focus:border-brand-primary"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2.5 text-body focus:border-brand-primary"
             />
           </div>
           <div>
@@ -92,7 +93,7 @@ export function CerrarTurno({ turno, onCerrado, onCancelar }: CerrarTurnoProps) 
               type="text"
               value={motivoDiferencia}
               onChange={(evento) => setMotivoDiferencia(evento.target.value)}
-              className="w-full rounded-[var(--radius-card)] border border-brand-primary-soft px-3 py-2.5 text-body focus:border-brand-primary"
+              className="w-full rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2.5 text-body focus:border-brand-primary"
             />
           </div>
 

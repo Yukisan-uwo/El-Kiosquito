@@ -83,7 +83,7 @@ describe('SolicitudesArco', () => {
     const selectorResolucion = combos[combos.length - 1]
     expect(within(selectorResolucion).queryByRole('option', { name: 'Pendiente' })).not.toBeInTheDocument()
     await userEvent.selectOptions(selectorResolucion, 'atendida')
-    await userEvent.type(screen.getByPlaceholderText('Respuesta para el cliente (obligatoria, Art. 10.3)'), 'Te enviamos el detalle por correo')
+    await userEvent.type(screen.getByPlaceholderText('Respuesta para el cliente (obligatoria)'), 'Te enviamos el detalle por correo')
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar resolución' }))
 
     const llamada = apiFetchMock.mock.calls.find(([ruta]) => ruta === '/admin/arco/1/resolver')
@@ -100,7 +100,7 @@ describe('SolicitudesArco', () => {
     render(<SolicitudesArco />)
     await screen.findByText(/Quiero saber qué datos/)
     await userEvent.click(screen.getByRole('button', { name: 'Resolver solicitud' }))
-    await userEvent.type(screen.getByPlaceholderText('Respuesta para el cliente (obligatoria, Art. 10.3)'), 'x')
+    await userEvent.type(screen.getByPlaceholderText('Respuesta para el cliente (obligatoria)'), 'x')
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar resolución' }))
     expect(await screen.findByText(/obligatoria para resolver/)).toBeInTheDocument()
   })

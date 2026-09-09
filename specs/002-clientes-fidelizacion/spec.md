@@ -40,6 +40,8 @@ Como Encargado de Fidelización, quiero identificar qué clientes son realmente 
 - **RF-CF-009** *(añadido en enmienda v1.1)*: Toda asignación de segmento DEBE registrar la versión del modelo de segmentación que la produjo.
 - **RF-CF-010** *(añadido en enmienda v1.1)*: El sistema DEBE permitir consultar el historial completo de segmentos por los que pasó un cliente, con el rango de fechas en que cada uno estuvo vigente.
 - **RF-CF-011** *(añadido en enmienda v1.1)*: El sistema DEBE exponer el catálogo `segmento` como consulta, incluyendo la prioridad comercial de cada uno, para que `005-promociones-inteligentes` decida a qué segmento atender primero cuando el presupuesto de cupones es limitado.
+- **RF-CF-012** *(añadido en enmienda v1.3, cumplimiento LOPDP)*: El sistema DEBE registrar y auditar el consentimiento de privacidad y la aceptación expresa de la política de privacidad al registrar un cliente en caja o administración.
+- **RF-CF-013** *(añadido en enmienda v1.4, búsqueda interactiva en POS)*: La búsqueda de clientes (`GET /clientes?q=`) DEBE admitir el parámetro `q` como opcional. Si se omite o está vacío, el endpoint debe devolver un listado inicial de clientes registrados (hasta 50 registros) para poblar el menú interactivo desplegable al hacer foco en la barra de caja, y filtrar reactivamente por nombre o contacto conforme el cajero escribe.
 
 ## Requisitos No Funcionales
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
+import { useSearchParams } from 'react-router-dom'
 import { fadeUp } from '@/motion/tokens'
 import { HistorialCosto } from './HistorialCosto'
 import { NuevaOrden } from './NuevaOrden'
@@ -16,28 +17,20 @@ const PESTANAS: { id: Seccion; etiqueta: string }[] = [
   { id: 'historial-costo', etiqueta: 'Historial de costo' },
 ]
 
-/**
- * Pantalla de Compras y Proveedores (Tarea #57), rol Encargado de
- * Compras — el único con `compras_proveedores` en su navegación
- * (`auth/roles.ts`), con alcance de cadena completa (Art. 3.3).
- *
- * Tres huecos reales de backend encontrados y resueltos ANTES de
- * escribir esta pantalla (sin ellos habría sido un formulario de alta
- * sin ningún listado, inutilizable en la práctica): `GET /proveedores`
- * y `GET /compras/ordenes` (008, enmienda v1.3, RF-CP-017/018) y
- * `GET /sucursales` (009, enmienda v1.2, RF-ES-013) — los tres
- * verificados contra la matriz RBAC real antes de escribir código: en
- * los tres casos `leer` ya estaba concedido, ninguno necesitó
- * migración. Mismo patrón ya aplicado en esta sesión a la búsqueda de
- * clientes de 002 (RF-CF-013).
- */
 export function Compras() {
-  const [seccion, setSeccion] = useState<Seccion>('ordenes')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const seccionParam = searchParams.get('seccion') as Seccion | null
+  const seccion: Seccion = seccionParam && PESTANAS.some((p) => p.id === seccionParam) ? seccionParam : 'ordenes'
+
   const [ordenRecienCreada, setOrdenRecienCreada] = useState<number | null>(null)
+
+  function cambiarSeccion(nueva: Seccion) {
+    setSearchParams({ seccion: nueva })
+  }
 
   function manejarOrdenCreada(orden: OrdenCompra) {
     setOrdenRecienCreada(orden.id)
-    setSeccion('ordenes')
+    cambiarSeccion('ordenes')
   }
 
   return (
@@ -49,15 +42,17 @@ export function Compras() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-surface-bg pb-2">
+      <div className="flex flex-wrap gap-2 border-b-2 border-amber-200/80 pb-3">
         {PESTANAS.map((pestana) => (
           <button
             key={pestana.id}
             type="button"
-            onClick={() => setSeccion(pestana.id)}
+            onClick={() => cambiarSeccion(pestana.id)}
             aria-pressed={seccion === pestana.id}
-            className={`rounded-[var(--radius-card)] px-3 py-2 text-body ${
-              seccion === pestana.id ? 'bg-brand-primary text-white' : 'text-text-secondary hover:bg-surface-bg'
+            className={`rounded-xl px-4 py-2 text-body font-semibold transition-all ${
+              seccion === pestana.id
+                ? 'bg-brand-primary text-white shadow-2xs'
+                : 'border-2 border-amber-200/80 bg-white text-brand-deep hover:bg-amber-50 hover:border-amber-300'
             }`}
           >
             {pestana.etiqueta}

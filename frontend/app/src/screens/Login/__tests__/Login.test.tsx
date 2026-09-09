@@ -69,4 +69,21 @@ describe('Login', () => {
     expect(screen.getByRole('button', { name: 'Ingresando...' })).toBeDisabled()
     resolver?.()
   })
+
+  it('permite alternar la visibilidad de la contraseña con el botón de mostrar/ocultar', async () => {
+    render(<MemoryRouter><Login /></MemoryRouter>)
+
+    const inputPassword = screen.getByLabelText('Contraseña')
+    expect(inputPassword).toHaveAttribute('type', 'password')
+
+    const botonMostrar = screen.getByRole('button', { name: 'Mostrar contraseña' })
+    await userEvent.click(botonMostrar)
+
+    expect(inputPassword).toHaveAttribute('type', 'text')
+
+    const botonOcultar = screen.getByRole('button', { name: 'Ocultar contraseña' })
+    await userEvent.click(botonOcultar)
+
+    expect(inputPassword).toHaveAttribute('type', 'password')
+  })
 })

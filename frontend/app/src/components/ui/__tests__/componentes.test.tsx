@@ -4,6 +4,7 @@ import { Boton } from '../Boton'
 import { BadgeEstado } from '../BadgeEstado'
 import { CardKpi } from '../CardKpi'
 import { EstadoVacio } from '../EstadoVacio'
+import { Paginacion } from '../Paginacion'
 
 describe('CardKpi', () => {
   it('muestra el pie de tamaño de muestra/periodo cuando el dato viene de ML', () => {
@@ -56,3 +57,37 @@ describe('EstadoVacio', () => {
     expect(screen.getByText('Registrá la primera revisión de seguridad.')).toBeInTheDocument()
   })
 })
+
+describe('Paginacion', () => {
+  it('muestra el rango correcto y botones de navegación', () => {
+    render(
+      <Paginacion
+        paginaActual={2}
+        totalPaginas={5}
+        totalItems={50}
+        itemsPorPagina={10}
+        onCambiarPagina={() => {}}
+      />,
+    )
+    expect(screen.getByText(/11/)).toBeInTheDocument()
+    expect(screen.getByText(/20/)).toBeInTheDocument()
+    expect(screen.getByText(/50/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeEnabled()
+  })
+
+  it('deshabilita el botón anterior en la primera página', () => {
+    render(
+      <Paginacion
+        paginaActual={1}
+        totalPaginas={3}
+        totalItems={25}
+        itemsPorPagina={10}
+        onCambiarPagina={() => {}}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeEnabled()
+  })
+})
+

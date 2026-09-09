@@ -121,4 +121,42 @@ describe('NuevaOrden', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Registrar orden de compra' }))
     expect(await screen.findByText(/dado de baja/)).toBeInTheDocument()
   })
+
+  it('resalta errores cuando la cantidad es 0 o inválida y muestra el mensaje de corrección', async () => {
+    mockRutasBase()
+    render(<NuevaOrden onOrdenCreada={vi.fn()} />)
+    await screen.findByText('Distribuidora Andina')
+    await userEvent.selectOptions(screen.getByLabelText('Proveedor'), '1')
+    await userEvent.selectOptions(screen.getByLabelText('Sucursal destino'), '901')
+    await userEvent.type(screen.getByPlaceholderText('Buscar producto por nombre…'), 'leche')
+    await userEvent.click(await screen.findByRole('button', { name: /Leche entera 1L/ }))
+
+    const inputCantidad = screen.getByDisplayValue('1')
+    await userEvent.clear(inputCantidad)
+    await userEvent.type(inputCantidad, '0')
+
+    expect(await screen.findByText('Debe ser > 0')).toBeInTheDocument()
+    expect(screen.getByText(/Hay productos con cantidad 0 o precios vacíos\/inválidos/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar orden de compra' })).toBeDisabled()
+  })
+
+  it('resalta errores cuando el precio es 0 y no permite registrar la orden con valor 0', async () => {
+    mockRutasBase()
+    render(<NuevaOrden onOrdenCreada={vi.fn()} />)
+    await screen.findByText('Distribuidora Andina')
+    await userEvent.selectOptions(screen.getByLabelText('Proveedor'), '1')
+    await userEvent.selectOptions(screen.getByLabelText('Sucursal destino'), '901')
+    await userEvent.type(screen.getByPlaceholderText('Buscar producto por nombre…'), 'leche')
+    await userEvent.click(await screen.findByRole('button', { name: /Leche entera 1L/ }))
+
+    expect(await screen.findByText('Debe ser mayor a $0.00')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar orden de compra' })).toBeDisabled()
+
+    const inputPrecio = screen.getByDisplayValue('0')
+    await userEvent.clear(inputPrecio)
+    await userEvent.type(inputPrecio, '1.50')
+
+    expect(screen.queryByText('Debe ser mayor a $0.00')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar orden de compra' })).toBeEnabled()
+  })
 })

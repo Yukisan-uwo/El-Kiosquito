@@ -19,6 +19,7 @@ import secrets
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, log_accion, require_permission
@@ -246,6 +247,34 @@ def consultar_cupones_cliente(
     if db.get(Cliente, cliente_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cliente no encontrado")
     return db.query(Cupon).filter(Cupon.cliente_id == cliente_id).order_by(Cupon.fecha_envio.desc()).all()
+
+
+@router.get("/promociones/cupones/validar/{codigo}", response_model=CuponOut, tags=["promociones"])
+def validar_cupon_por_codigo(
+    codigo: str,
+    db: Session = Depends(get_db),
+    _current_user: Usuario = Depends(require_permission("cupon", "leer")),
+) -> Cupon:
+    """Valida un código de cupón recibido por el cliente (ej. por correo electrónico, Art. 8.4).
+    Verifica que exista, que esté activo y que no esté expirado (RN-PI-001)."""
+    cod = codigo.strip().upper()
+    cupon = db.query(Cupon).filter(func.upper(Cupon.codigo) == cod).first()
+    if cupon is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Cupón '{codigo}' no encontrado")
+
+    ahora = datetime.utcnow()
+    if cupon.estado == "activo" and cupon.fecha_expiracion <= ahora:
+        cupon.estado = "expirado"
+        db.commit()
+
+    if cupon.estado == "canjeado":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "El cupón ya fue canjeado en una compra previa")
+    if cupon.estado == "expirado" or cupon.fecha_expiracion <= ahora:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "El cupón ya se encuentra expirado")
+    if cupon.estado != "activo":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"El cupón no está activo (estado: {cupon.estado})")
+
+    return cupon
 
 
 # ---------------------------------------------------------------------------

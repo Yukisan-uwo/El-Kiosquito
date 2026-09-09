@@ -48,6 +48,7 @@ function PantallaDePrueba({ promiseIniciarSesionRef }: PantallaDePruebaProps = {
 describe('AuthProvider', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     apiFetchMock.mockReset()
   })
 
@@ -77,6 +78,15 @@ describe('AuthProvider', () => {
     render(<AuthProvider><PantallaDePrueba /></AuthProvider>)
 
     expect(await screen.findByText('rol:cajero')).toBeInTheDocument()
+  })
+
+  it('restaura la sesión desde localStorage al recargar la página', async () => {
+    const token = construirToken({ sub: 'encargado@elkiosquito.ec', rol: 'encargado_sucursal', sucursal_ids: [2], exp: 9999999999 })
+    localStorage.setItem('elkiosquito.token', token)
+
+    render(<AuthProvider><PantallaDePrueba /></AuthProvider>)
+
+    expect(await screen.findByText('rol:encargado_sucursal')).toBeInTheDocument()
   })
 
   it('un token vencido guardado se descarta, no restaura sesión', async () => {
