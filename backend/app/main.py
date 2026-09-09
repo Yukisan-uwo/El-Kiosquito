@@ -33,6 +33,7 @@ from app.routers import (
     compras,
     core_ventas,
     expansion,
+    gastos,
     pagos,
     precios,
     promociones,
@@ -69,6 +70,7 @@ app.include_router(caja.router, prefix="/api/v1")
 app.include_router(pagos.router, prefix="/api/v1")
 app.include_router(compras.router, prefix="/api/v1")
 app.include_router(expansion.router, prefix="/api/v1")
+app.include_router(gastos.router, prefix="/api/v1")
 app.include_router(analitica.router, prefix="/api/v1")
 
 

@@ -17,6 +17,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { Boton } from '@/components/ui/Boton'
@@ -30,6 +31,7 @@ import { MensajeError } from '@/components/ui/MensajeError'
 import { Paginacion } from '@/components/ui/Paginacion'
 import { usePaginacion } from '@/components/ui/usePaginacion'
 import { fadeUp, stagger } from '@/motion/tokens'
+import { SeccionGastosSimulador } from './SeccionGastosSimulador'
 
 interface MargenPorSucursal {
   sucursal_id: number
@@ -496,6 +498,19 @@ export function DashboardDueno() {
   const [hasta, setHasta] = useState(HOY)
   const [rangoAplicado, setRangoAplicado] = useState({ desde, hasta })
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabActiva = searchParams.get('tab') === 'simulador' ? 'simulador' : 'resumen'
+
+  function cambiarTab(tab: 'resumen' | 'simulador') {
+    if (tab === 'resumen') {
+      const nuevos = new URLSearchParams(searchParams)
+      nuevos.delete('tab')
+      setSearchParams(nuevos)
+    } else {
+      setSearchParams({ tab: 'simulador' })
+    }
+  }
+
   return (
     <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-8">
       {/* Encabezado formal visible únicamente en impresión o PDF */}
@@ -507,72 +522,108 @@ export function DashboardDueno() {
         usuarioNombre={sesion?.claims.sub ?? 'Dirección General'}
       />
 
-      <motion.div variants={fadeUp} className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-display text-display-lg text-brand-deep font-bold">Panel general</p>
-          <p className="mt-1 text-body text-text-secondary">
-            Comparación consolidada de ventas, rentabilidad y pérdidas de toda la red.
-          </p>
-        </div>
-        <div className="no-print flex flex-wrap items-end gap-3">
-          <form
-            className="flex flex-wrap items-end gap-2"
-            onSubmit={(evento) => {
-              evento.preventDefault()
-              setRangoAplicado({ desde, hasta })
-            }}
-          >
-            <label className="flex flex-col text-body-sm text-text-secondary font-medium">
-              Desde
-              <input
-                type="date"
-                value={desde}
-                max={hasta}
-                onChange={(evento) => setDesde(evento.target.value)}
-                className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
+      {/* Selector de Pestañas del Dueño */}
+      <div className="no-print flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-white p-1.5 shadow-2xs w-fit">
+        <button
+          type="button"
+          onClick={() => cambiarTab('resumen')}
+          aria-pressed={tabActiva === 'resumen'}
+          className={`rounded-xl px-4 py-2 text-body-sm font-bold transition-all ${
+            tabActiva === 'resumen'
+              ? 'bg-brand-primary text-white shadow-2xs'
+              : 'text-brand-deep hover:bg-amber-50 hover:text-brand-primary'
+          }`}
+        >
+          📊 Resumen Ejecutivo de Red
+        </button>
+        <button
+          type="button"
+          onClick={() => cambiarTab('simulador')}
+          aria-pressed={tabActiva === 'simulador'}
+          className={`rounded-xl px-4 py-2 text-body-sm font-bold transition-all ${
+            tabActiva === 'simulador'
+              ? 'bg-brand-primary text-white shadow-2xs'
+              : 'text-brand-deep hover:bg-amber-50 hover:text-brand-primary'
+          }`}
+        >
+          ✨ Gastos del Local y Simulador de Precios con IA
+        </button>
+      </div>
+
+      {tabActiva === 'simulador' ? (
+        <motion.section variants={fadeUp}>
+          <SeccionGastosSimulador />
+        </motion.section>
+      ) : (
+        <>
+          <motion.div variants={fadeUp} className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-display text-display-lg text-brand-deep font-bold">Panel general</p>
+              <p className="mt-1 text-body text-text-secondary">
+                Comparación consolidada de ventas, rentabilidad y pérdidas de toda la red.
+              </p>
+            </div>
+            <div className="no-print flex flex-wrap items-end gap-3">
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(evento) => {
+                  evento.preventDefault()
+                  setRangoAplicado({ desde, hasta })
+                }}
+              >
+                <label className="flex flex-col text-body-sm text-text-secondary font-medium">
+                  Desde
+                  <input
+                    type="date"
+                    value={desde}
+                    max={hasta}
+                    onChange={(evento) => setDesde(evento.target.value)}
+                    className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
+                  />
+                </label>
+                <label className="flex flex-col text-body-sm text-text-secondary font-medium">
+                  Hasta
+                  <input
+                    type="date"
+                    value={hasta}
+                    min={desde}
+                    max={HOY}
+                    onChange={(evento) => setHasta(evento.target.value)}
+                    className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
+                  />
+                </label>
+                <Boton type="submit" variante="secundario">Aplicar</Boton>
+              </form>
+
+              <BotonExportarReporte
+                etiqueta="Exportar informe (PDF)"
+                tituloReporte="Informe Ejecutivo Consolidado de Red"
+                variante="primario"
               />
-            </label>
-            <label className="flex flex-col text-body-sm text-text-secondary font-medium">
-              Hasta
-              <input
-                type="date"
-                value={hasta}
-                min={desde}
-                max={HOY}
-                onChange={(evento) => setHasta(evento.target.value)}
-                className="rounded-xl border-2 border-amber-200/90 bg-white px-3 py-2 text-body shadow-2xs focus:border-brand-primary"
-              />
-            </label>
-            <Boton type="submit" variante="secundario">Aplicar</Boton>
-          </form>
+            </div>
+          </motion.div>
 
-          <BotonExportarReporte
-            etiqueta="Exportar informe (PDF)"
-            tituloReporte="Informe Ejecutivo Consolidado de Red"
-            variante="primario"
-          />
-        </div>
-      </motion.div>
+          <motion.section variants={fadeUp} className="print-break-inside-avoid">
+            <p className="mb-3 text-title text-text-primary font-bold">Margen comercial por sucursal</p>
+            <SeccionMargen desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
+          </motion.section>
 
-      <motion.section variants={fadeUp} className="print-break-inside-avoid">
-        <p className="mb-3 text-title text-text-primary font-bold">Margen comercial por sucursal</p>
-        <SeccionMargen desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
-      </motion.section>
+          <motion.section variants={fadeUp} className="print-break-inside-avoid">
+            <p className="mb-3 text-title text-text-primary font-bold">Merma por sucursal</p>
+            <SeccionMerma desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
+          </motion.section>
 
-      <motion.section variants={fadeUp} className="print-break-inside-avoid">
-        <p className="mb-3 text-title text-text-primary font-bold">Merma por sucursal</p>
-        <SeccionMerma desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
-      </motion.section>
+          <motion.section variants={fadeUp} className="print-break-inside-avoid">
+            <p className="mb-3 text-title text-text-primary font-bold">Ticket promedio por sucursal</p>
+            <SeccionTicketPromedio desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
+          </motion.section>
 
-      <motion.section variants={fadeUp} className="print-break-inside-avoid">
-        <p className="mb-3 text-title text-text-primary font-bold">Ticket promedio por sucursal</p>
-        <SeccionTicketPromedio desde={rangoAplicado.desde} hasta={rangoAplicado.hasta} />
-      </motion.section>
-
-      {/* Asistente conversacional: interactivo, se excluye de la exportación impresa */}
-      <motion.section variants={fadeUp} className="no-print">
-        <PanelAsistente />
-      </motion.section>
+          {/* Asistente conversacional: interactivo, se excluye de la exportación impresa */}
+          <motion.section variants={fadeUp} className="no-print">
+            <PanelAsistente />
+          </motion.section>
+        </>
+      )}
     </motion.div>
   )
 }

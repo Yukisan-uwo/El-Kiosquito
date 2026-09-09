@@ -7,8 +7,9 @@ Fuente: specs-v2/009-expansion-sucursales/data-model.md (tras enmienda v1.1).
 """
 
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, ForeignKey, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -96,3 +97,21 @@ class HerenciaCatalogoSucursal(Base):
     fecha: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     cantidad_productos_heredados: Mapped[int] = mapped_column(nullable=False)
     cantidad_productos_pendientes: Mapped[int] = mapped_column(nullable=False)
+
+
+class GastoSucursal(Base):
+    """Gastos fijos operativos del local (arriendo, energía eléctrica/luz,
+    agua, sueldos fijos, internet/POS, mantenimiento). Base para el costeo
+    por absorción y el simulador de punto de equilibrio con IA."""
+
+    __tablename__ = "gasto_sucursal"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sucursal_id: Mapped[int] = mapped_column(ForeignKey("sucursal.id"), nullable=False, index=True)
+    concepto: Mapped[str] = mapped_column(String(120), nullable=False)
+    categoria_gasto: Mapped[str] = mapped_column(String(50), nullable=False, default="servicio", server_default="servicio")
+    monto_mensual: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    creado_en: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now(), onupdate=datetime.utcnow)
+
