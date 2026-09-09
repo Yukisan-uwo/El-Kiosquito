@@ -302,3 +302,49 @@ describe('DashboardSucursal — navegación por secciones y pestañas', () => {
     expect(screen.getByRole('button', { name: 'Mermas' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
+
+describe('DashboardSucursal — lotes e ingreso de stock', () => {
+  it('permite abrir el modal de ingreso de stock con lote y registrar un lote perecedero', async () => {
+    let llamadoIngreso: unknown = null
+    apiFetchMock.mockImplementation((ruta: string, opciones?: { method?: string; body?: unknown }) => {
+      if (ruta === '/productos') return Promise.resolve(CATALOGO)
+      if (ruta === '/mermas') return Promise.resolve([])
+      if (ruta === '/inventario/stock-bajo') return Promise.resolve([])
+      if (ruta === '/inventario/proximos-a-caducar') return Promise.resolve([])
+      if (ruta === '/inventario/sin-rotacion') return Promise.resolve([])
+      if (ruta === '/inventario/ingresos' && opciones?.method === 'POST') {
+        llamadoIngreso = opciones.body
+        return Promise.resolve({
+          producto_id: 1,
+          sucursal_id: 901,
+          cantidad_disponible: '10.000',
+          lote_id: 101,
+        })
+      }
+      return Promise.reject(new Error(`Ruta no mockeada: ${ruta}`))
+    })
+
+    render(<DashboardSucursal />, '/sucursal?seccion=lotes')
+    const botonIngreso = await screen.findByRole('button', { name: '+ Ingreso de stock / Lote' })
+    await userEvent.click(botonIngreso)
+
+    expect(await screen.findByText('Registrar ingreso de stock / Lote')).toBeInTheDocument()
+
+    // Esperar a que el catálogo cargue y el select tenga seleccionado el producto
+    const selectProducto = await screen.findByRole('combobox')
+    await waitFor(() => expect(selectProducto).toHaveValue('1'))
+
+    const botonGuardar = screen.getByRole('button', { name: 'Registrar ingreso' })
+    await userEvent.click(botonGuardar)
+
+    await waitFor(() => {
+      expect(llamadoIngreso).toEqual({
+        producto_id: 1,
+        sucursal_id: 901,
+        cantidad: 10,
+        fecha_caducidad: expect.any(String),
+      })
+    })
+  })
+})
+

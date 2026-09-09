@@ -473,6 +473,7 @@ def buscar_productos(
                 categoria_nombre=nombres_categoria.get(producto.categoria_id, ""),
                 unidad_venta_codigo=producto.unidad_venta_codigo,
                 es_fraccionable=producto.es_fraccionable,
+                es_perecedero=producto.es_perecedero,
                 activo=producto.activo,
                 precio_venta_vigente=_money(precio_row.precio_venta) if precio_row else None,
                 stock_actual=stock_item.cantidad_disponible if stock_item else None,

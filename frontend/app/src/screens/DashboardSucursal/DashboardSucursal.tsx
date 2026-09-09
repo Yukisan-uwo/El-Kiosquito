@@ -65,6 +65,7 @@ import {
   listarTurnosSucursal,
   registrarAjusteInventario,
   registrarArqueoParcial,
+  registrarIngresoStock,
   registrarMerma,
   registrarRetiroLote,
   type CatalogoItem,
@@ -826,6 +827,173 @@ function ModalRetirarLote({
   )
 }
 
+function ModalIngresoStockLote({
+  sucursalId,
+  mapaProductos,
+  onCerrar,
+  onIngresado,
+}: {
+  sucursalId: number
+  mapaProductos: Map<number, string> | null
+  onCerrar: () => void
+  onIngresado: () => void
+}) {
+  const [productos, setProductos] = useState<ProductoCatalogo[]>([])
+  const [cargandoProductos, setCargandoProductos] = useState(true)
+  const [productoId, setProductoId] = useState<number>(0)
+  const [cantidad, setCantidad] = useState<string>('10')
+
+  // Fecha de caducidad por defecto: hoy + 15 días
+  const fechaDefault = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 15)
+    return d.toISOString().slice(0, 10)
+  }, [])
+  const hoyIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const [fechaCaducidad, setFechaCaducidad] = useState<string>(fechaDefault)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCargandoProductos(true)
+    apiFetch<ProductoCatalogo[]>('/productos', { query: { sucursal_id: sucursalId } })
+      .then((items) => {
+        setProductos(items)
+        if (items.length > 0) {
+          const perecedero = items.find((p) => p.es_perecedero)
+          setProductoId(perecedero ? perecedero.id : items[0].id)
+        }
+      })
+      .catch(() => {
+        if (mapaProductos && mapaProductos.size > 0) {
+          const fallback = Array.from(mapaProductos.entries()).map(([id, nombre]) => ({
+            id,
+            nombre,
+            es_perecedero: true,
+          }))
+          setProductos(fallback)
+          setProductoId(fallback[0].id)
+        }
+      })
+      .finally(() => setCargandoProductos(false))
+  }, [sucursalId, mapaProductos])
+
+  const productoSeleccionado = productos.find((p) => p.id === productoId)
+
+  async function manejarGuardar(e: React.FormEvent) {
+    e.preventDefault()
+    const cantNum = Number(cantidad)
+    if (!Number.isFinite(cantNum) || cantNum <= 0) {
+      setError('La cantidad debe ser un número mayor a 0.')
+      return
+    }
+    if (!fechaCaducidad) {
+      setError('Debes especificar la fecha de caducidad del lote.')
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await registrarIngresoStock({
+        producto_id: productoId,
+        sucursal_id: sucursalId,
+        cantidad: cantNum,
+        fecha_caducidad: fechaCaducidad,
+      })
+      onIngresado()
+      onCerrar()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.mensajeUsuario : 'No se pudo registrar el ingreso de stock.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+      <div className="w-full max-w-md rounded-2xl border-2 border-amber-200/90 bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-title font-bold text-brand-deep">Registrar ingreso de stock / Lote</h3>
+          <button type="button" onClick={onCerrar} className="text-text-secondary hover:text-text-primary">✕</button>
+        </div>
+        {error && <div className="mb-3"><MensajeError mensaje={error} /></div>}
+        <form onSubmit={manejarGuardar} noValidate className="space-y-4">
+          <div>
+            <label className="block text-label uppercase text-text-secondary mb-1">Producto</label>
+            {cargandoProductos ? (
+              <p className="text-body-sm text-text-secondary">Cargando productos...</p>
+            ) : (
+              <select
+                value={productoId}
+                onChange={(e) => setProductoId(Number(e.target.value))}
+                className="w-full rounded-xl border-2 border-amber-200/90 bg-white p-2.5 text-body focus:border-brand-primary"
+              >
+                {productos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} {p.es_perecedero ? '(Perecedero - genera lote)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {productoSeleccionado && (
+              <p className={`mt-1.5 text-xs ${productoSeleccionado.es_perecedero ? 'text-status-success font-medium' : 'text-amber-700'}`}>
+                {productoSeleccionado.es_perecedero
+                  ? '✓ Producto perecedero: se registrará un lote con seguimiento y semáforo de vencimiento.'
+                  : 'ℹ Nota: Si el producto no es perecedero, incrementará el stock general pero no creará lote con vencimiento.'}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-label uppercase text-text-secondary mb-1">Cantidad a ingresar</label>
+              <input
+                type="number"
+                step="1"
+                min="0.01"
+                required
+                value={cantidad}
+                onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault() }}
+                onChange={(e) => setCantidad(e.target.value)}
+                className={`w-full rounded-xl border-2 bg-white p-2 text-body focus:outline-none ${
+                  cantidad !== '' && Number(cantidad) <= 0
+                    ? 'border-status-danger bg-red-50/30 text-status-danger'
+                    : 'border-amber-200/90 focus:border-brand-primary'
+                }`}
+              />
+              {cantidad !== '' && Number(cantidad) <= 0 && (
+                <p className="mt-1 text-[11px] font-semibold text-status-danger">Debe ser mayor a 0</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-label uppercase text-text-secondary mb-1">Fecha de caducidad</label>
+              <input
+                type="date"
+                required
+                min={hoyIso}
+                value={fechaCaducidad}
+                onChange={(e) => setFechaCaducidad(e.target.value)}
+                className="w-full rounded-xl border-2 border-amber-200/90 bg-white p-2 text-body focus:border-brand-primary"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Boton type="button" variante="secundario" onClick={onCerrar}>Cancelar</Boton>
+            <Boton
+              type="submit"
+              disabled={guardando || !cantidad || Number(cantidad) <= 0 || !fechaCaducidad || productoId === 0}
+            >
+              {guardando ? 'Guardando...' : 'Registrar ingreso'}
+            </Boton>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function SeccionMermas({ sucursalId, desde, hasta, mapaProductos }: SeccionProps & { desde: string; hasta: string }) {
   const reporte = useMermas(sucursalId, desde, hasta)
   const [busqueda, setBusqueda] = useState('')
@@ -1196,6 +1364,7 @@ function SeccionProximosACaducar({ sucursalId, mapaProductos }: SeccionProps) {
   const reporte = useProximosACaducar(sucursalId)
   const [busqueda, setBusqueda] = useState('')
   const [loteParaRetiro, setLoteParaRetiro] = useState<LoteProximoACaducar | null>(null)
+  const [mostrarIngreso, setMostrarIngreso] = useState(false)
 
   const datosCaducar = reporte.estado === 'listo' ? reporte.datos : []
   const itemsFiltrados = datosCaducar.filter((fila) => {
@@ -1218,10 +1387,25 @@ function SeccionProximosACaducar({ sucursalId, mapaProductos }: SeccionProps) {
   if (reporte.estado === 'error') return <MensajeError mensaje={reporte.error} onReintentar={reporte.reintentar} />
   if (reporte.datos.length === 0) {
     return (
-      <EstadoVacio
-        titulo="Sin lotes por caducar pronto"
-        descripcion="No hay lotes activos venciendo en el horizonte de alerta configurado — buena señal, no un dato faltante."
-      />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Boton onClick={() => setMostrarIngreso(true)} className="h-8 text-body-sm">
+            + Ingreso de stock / Lote
+          </Boton>
+        </div>
+        <EstadoVacio
+          titulo="Sin lotes por caducar pronto"
+          descripcion="No hay lotes activos venciendo en el horizonte de alerta configurado — buena señal, no un dato faltante."
+        />
+        {mostrarIngreso && (
+          <ModalIngresoStockLote
+            sucursalId={sucursalId}
+            mapaProductos={mapaProductos}
+            onCerrar={() => setMostrarIngreso(false)}
+            onIngresado={() => reporte.reintentar()}
+          />
+        )}
+      </div>
     )
   }
 
@@ -1238,7 +1422,7 @@ function SeccionProximosACaducar({ sucursalId, mapaProductos }: SeccionProps) {
         <CardKpi etiqueta="Cantidad restante total" cifra={cantidadTotal.toFixed(2)} />
       </div>
 
-      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <BarraBusqueda
           valor={busqueda}
           onChange={setBusqueda}
@@ -1246,6 +1430,9 @@ function SeccionProximosACaducar({ sucursalId, mapaProductos }: SeccionProps) {
           totalCoincidencias={itemsFiltrados.length}
           className="max-w-sm"
         />
+        <Boton onClick={() => setMostrarIngreso(true)} className="h-9 shrink-0 text-body-sm">
+          + Ingreso de stock / Lote
+        </Boton>
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-2xl border-2 border-amber-200/90 bg-white shadow-2xs">
@@ -1318,6 +1505,15 @@ function SeccionProximosACaducar({ sucursalId, mapaProductos }: SeccionProps) {
           nombreProducto={nombreProducto(mapaProductos, loteParaRetiro.producto_id)}
           onCerrar={() => setLoteParaRetiro(null)}
           onRetirado={() => reporte.reintentar()}
+        />
+      )}
+
+      {mostrarIngreso && (
+        <ModalIngresoStockLote
+          sucursalId={sucursalId}
+          mapaProductos={mapaProductos}
+          onCerrar={() => setMostrarIngreso(false)}
+          onIngresado={() => reporte.reintentar()}
         />
       )}
     </div>

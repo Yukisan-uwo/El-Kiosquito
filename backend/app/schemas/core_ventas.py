@@ -116,6 +116,7 @@ class ProductoBusquedaOut(BaseModel):
     categoria_nombre: str
     unidad_venta_codigo: str
     es_fraccionable: bool
+    es_perecedero: bool = False
     activo: bool
     precio_venta_vigente: Decimal | None = None
     stock_actual: Decimal | None = None

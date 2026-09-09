@@ -39,6 +39,7 @@ export interface StockSinRotacion {
 export interface ProductoCatalogo {
   id: number
   nombre: string
+  es_perecedero?: boolean
   precio_venta_vigente?: number | null
 }
 
@@ -145,3 +146,25 @@ export function registrarRetiroLote(
     body: payload,
   })
 }
+
+export interface IngresoStockPayload {
+  producto_id: number
+  sucursal_id: number
+  cantidad: number
+  fecha_caducidad?: string | null
+}
+
+export interface IngresoStockRespuesta {
+  producto_id: number
+  sucursal_id: number
+  cantidad_disponible: string | number
+  lote_id: number | null
+}
+
+export function registrarIngresoStock(payload: IngresoStockPayload): Promise<IngresoStockRespuesta> {
+  return apiFetch<IngresoStockRespuesta>('/inventario/ingresos', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
